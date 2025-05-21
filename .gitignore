@@ -172,3 +172,31 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# ------------------------------
+# Custom for Graph Database Demo
+# ------------------------------
+
+# Environment variable templates 
+.env.*
+!.env.template  # allow sharing a safe template
+
+# CSV demo data – keep these in the repo!
+# (do NOT ignore if you want them tracked)
+
+# Neo4j local DB or import/export artifacts (if using Neo4j Desktop)
+*.dump
+*.db
+*.log
+import/
+logs/
+neo4j.conf
+
+# App screenshots, temporary images, or user files
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Streamlit or web app cache
+.streamlit/
