@@ -1,4 +1,4 @@
-# Knowledge-Graph-with-AI-Chatbot-for-Mechanical-System
+# KG-FOR-MECH
 The repo is a demo for creating AI chatbot based on knowledge graph for mechanical system
 
 ### 📂 Sensor Data Files
