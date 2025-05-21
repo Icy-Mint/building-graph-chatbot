@@ -44,3 +44,180 @@ CREATE (s)-[:REPORTS_TO]->(ac);
 
 //Quick Query to Visualize the Graph
 MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 50;
+
+//Link the csv file to the graph 
+
+LOAD CSV WITH HEADERS FROM "https://raw.githubusercontent.com/Icy-Mint/building-graph-chatbot/refs/heads/main/sensor_outputs/room_101_timeseries.csv" AS row
+WITH row,
+     toFloat(row.temperature) AS tempVal,
+     toInteger(row.occupancy) AS occVal,
+     datetime(replace(row.timestamp, " ", "T")) AS ts
+
+// Match the temperature and occupancy sensors
+MATCH (tempSensor:Sensor {sensor_id: row.sensor_id_temp})
+MATCH (occSensor:Sensor {sensor_id: row.sensor_id_occ})
+
+// Create temperature reading and link to sensor
+CREATE (tempReading:Reading {
+    timestamp: ts,
+    value: tempVal,
+    sensor_type: "temperature",
+    room_number: row.room_number
+})
+CREATE (tempSensor)-[:RECORDED]->(tempReading)
+
+// Create occupancy reading and link to sensor
+CREATE (occReading:Reading {
+    timestamp: ts,
+    value: occVal,
+    sensor_type: "occupancy",
+    room_number: row.room_number
+})
+CREATE (occSensor)-[:RECORDED]->(occReading);
+
+// for other rooms 
+
+LOAD CSV WITH HEADERS FROM "https://raw.githubusercontent.com/Icy-Mint/building-graph-chatbot/refs/heads/main/sensor_outputs/room_102_timeseries.csv" AS row
+WITH row,
+     toFloat(row.temperature) AS tempVal,
+     toInteger(row.occupancy) AS occVal,
+     datetime(replace(row.timestamp, " ", "T")) AS ts
+
+// Match the temperature and occupancy sensors
+MATCH (tempSensor:Sensor {sensor_id: row.sensor_id_temp})
+MATCH (occSensor:Sensor {sensor_id: row.sensor_id_occ})
+
+// Create temperature reading and link to sensor
+CREATE (tempReading:Reading {
+    timestamp: ts,
+    value: tempVal,
+    sensor_type: "temperature",
+    room_number: row.room_number
+})
+CREATE (tempSensor)-[:RECORDED]->(tempReading)
+
+// Create occupancy reading and link to sensor
+CREATE (occReading:Reading {
+    timestamp: ts,
+    value: occVal,
+    sensor_type: "occupancy",
+    room_number: row.room_number
+})
+CREATE (occSensor)-[:RECORDED]->(occReading);
+
+
+
+LOAD CSV WITH HEADERS FROM "https://raw.githubusercontent.com/Icy-Mint/building-graph-chatbot/refs/heads/main/sensor_outputs/room_103_timeseries.csv" AS row
+WITH row,
+     toFloat(row.temperature) AS tempVal,
+     toInteger(row.occupancy) AS occVal,
+     datetime(replace(row.timestamp, " ", "T")) AS ts
+
+// Match the temperature and occupancy sensors
+MATCH (tempSensor:Sensor {sensor_id: row.sensor_id_temp})
+MATCH (occSensor:Sensor {sensor_id: row.sensor_id_occ})
+
+// Create temperature reading and link to sensor
+CREATE (tempReading:Reading {
+    timestamp: ts,
+    value: tempVal,
+    sensor_type: "temperature",
+    room_number: row.room_number
+})
+CREATE (tempSensor)-[:RECORDED]->(tempReading)
+
+// Create occupancy reading and link to sensor
+CREATE (occReading:Reading {
+    timestamp: ts,
+    value: occVal,
+    sensor_type: "occupancy",
+    room_number: row.room_number
+})
+CREATE (occSensor)-[:RECORDED]->(occReading);
+
+
+LOAD CSV WITH HEADERS FROM "https://raw.githubusercontent.com/Icy-Mint/building-graph-chatbot/refs/heads/main/sensor_outputs/room_104_timeseries.csv" AS row
+WITH row,
+     toFloat(row.temperature) AS tempVal,
+     toInteger(row.occupancy) AS occVal,
+     datetime(replace(row.timestamp, " ", "T")) AS ts
+
+// Match the temperature and occupancy sensors
+MATCH (tempSensor:Sensor {sensor_id: row.sensor_id_temp})
+MATCH (occSensor:Sensor {sensor_id: row.sensor_id_occ})
+
+// Create temperature reading and link to sensor
+CREATE (tempReading:Reading {
+    timestamp: ts,
+    value: tempVal,
+    sensor_type: "temperature",
+    room_number: row.room_number
+})
+CREATE (tempSensor)-[:RECORDED]->(tempReading)
+
+// Create occupancy reading and link to sensor
+CREATE (occReading:Reading {
+    timestamp: ts,
+    value: occVal,
+    sensor_type: "occupancy",
+    room_number: row.room_number
+})
+CREATE (occSensor)-[:RECORDED]->(occReading);
+
+
+LOAD CSV WITH HEADERS FROM "https://raw.githubusercontent.com/Icy-Mint/building-graph-chatbot/refs/heads/main/sensor_outputs/room_105_timeseries.csv" AS row
+WITH row,
+     toFloat(row.temperature) AS tempVal,
+     toInteger(row.occupancy) AS occVal,
+     datetime(replace(row.timestamp, " ", "T")) AS ts
+
+// Match the temperature and occupancy sensors
+MATCH (tempSensor:Sensor {sensor_id: row.sensor_id_temp})
+MATCH (occSensor:Sensor {sensor_id: row.sensor_id_occ})
+
+// Create temperature reading and link to sensor
+CREATE (tempReading:Reading {
+    timestamp: ts,
+    value: tempVal,
+    sensor_type: "temperature",
+    room_number: row.room_number
+})
+CREATE (tempSensor)-[:RECORDED]->(tempReading)
+
+// Create occupancy reading and link to sensor
+CREATE (occReading:Reading {
+    timestamp: ts,
+    value: occVal,
+    sensor_type: "occupancy",
+    room_number: row.room_number
+})
+CREATE (occSensor)-[:RECORDED]->(occReading);
+
+
+LOAD CSV WITH HEADERS FROM "https://raw.githubusercontent.com/Icy-Mint/building-graph-chatbot/refs/heads/main/sensor_outputs/room_106_timeseries.csv" AS row
+WITH row,
+     toFloat(row.temperature) AS tempVal,
+     toInteger(row.occupancy) AS occVal,
+     datetime(replace(row.timestamp, " ", "T")) AS ts
+
+// Match the temperature and occupancy sensors
+MATCH (tempSensor:Sensor {sensor_id: row.sensor_id_temp})
+MATCH (occSensor:Sensor {sensor_id: row.sensor_id_occ})
+
+// Create temperature reading and link to sensor
+CREATE (tempReading:Reading {
+    timestamp: ts,
+    value: tempVal,
+    sensor_type: "temperature",
+    room_number: row.room_number
+})
+CREATE (tempSensor)-[:RECORDED]->(tempReading)
+
+// Create occupancy reading and link to sensor
+CREATE (occReading:Reading {
+    timestamp: ts,
+    value: occVal,
+    sensor_type: "occupancy",
+    room_number: row.room_number
+})
+CREATE (occSensor)-[:RECORDED]->(occReading);
