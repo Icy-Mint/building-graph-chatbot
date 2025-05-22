@@ -1,51 +1,46 @@
 
-//1. Wipe existing data (if any):
+// ─────────── 1.  Wipe ───────────
 MATCH (n) DETACH DELETE n;
 
-//2. Create Rooms and AC Units:
-UNWIND range(101, 106) AS room_number
-CREATE (:Room {room_number: toString(room_number), type: "dorm"});
+// ─────────── 2.  Rooms & AC Units ───────────
+UNWIND range(101, 106) AS rn
+CREATE (:Room {room_number: toString(rn), type: "dorm"});
 
-UNWIND [201, 202] AS mech_number
-CREATE (:Room {room_number: toString(mech_number), type: "mechanical"});
+UNWIND [201, 202] AS rn
+CREATE (:Room {room_number: toString(rn), type: "mechanical"});
 
 CREATE (ac1:AC_Unit {ac_id: "AC1"}),
        (ac2:AC_Unit {ac_id: "AC2"});
 
-MATCH (r:Room {room_number: "201"}), (ac:AC_Unit {ac_id: "AC1"})
-CREATE (r)-[:CONTAINS]->(ac);
+// Mechanical rooms *contain* the AC units
+MATCH (mech:Room {room_number: "201"}), (ac1:AC_Unit {ac_id: "AC1"})
+CREATE (mech)-[:CONTAINS]->(ac1);
 
-MATCH (r:Room {room_number: "202"}), (ac:AC_Unit {ac_id: "AC2"})
-CREATE (r)-[:CONTAINS]->(ac);
+MATCH (mech:Room {room_number: "202"}), (ac2:AC_Unit {ac_id: "AC2"})
+CREATE (mech)-[:CONTAINS]->(ac2);
 
-//3. Assign Dorm Rooms to AC Units:
+// ─────────── 3.  AC units SERVICE dorm rooms ───────────
+MATCH (ac1:AC_Unit {ac_id: "AC1"})
+MATCH (r:Room) WHERE r.room_number IN ["101","102","103"]
+CREATE (ac1)-[:SERVICES]->(r);
 
-MATCH (r:Room), (ac:AC_Unit {ac_id: "AC1"})
-WHERE r.room_number IN ["101", "102", "103"]
-CREATE (r)-[:SERVICED_BY]->(ac);
+MATCH (ac2:AC_Unit {ac_id: "AC2"})
+MATCH (r:Room) WHERE r.room_number IN ["104","105","106"]
+CREATE (ac2)-[:SERVICES]->(r);
 
-MATCH (r:Room), (ac:AC_Unit {ac_id: "AC2"})
-WHERE r.room_number IN ["104", "105", "106"]
-CREATE (r)-[:SERVICED_BY]->(ac);
-
-//4. Add Sensors:
-MATCH (r:Room)
-WHERE r.type = "dorm"
+// ─────────── 4.  Sensors ───────────
+MATCH (r:Room) WHERE r.type = "dorm"
 WITH r
-CREATE (occ:Sensor {sensor_id: "OCC_" + r.room_number, sensor_type: "occupancy"}),
+CREATE (occ:Sensor  {sensor_id: "OCC_"  + r.room_number, sensor_type: "occupancy"}),
        (temp:Sensor {sensor_id: "TEMP_" + r.room_number, sensor_type: "temperature"}),
        (r)-[:HAS_SENSOR]->(occ),
        (r)-[:HAS_SENSOR]->(temp);
 
-//5. Connect Temp Sensors to AC Units:
-MATCH (r:Room)-[:HAS_SENSOR]->(s:Sensor {sensor_type: "temperature"}),
-      (r)-[:SERVICED_BY]->(ac:AC_Unit)
+// ─────────── 5.  Temp sensors REPORT_TO their AC unit ───────────
+MATCH (ac:AC_Unit)-[:SERVICES]->(r:Room)-[:HAS_SENSOR]->(s:Sensor {sensor_type:"temperature"})
 CREATE (s)-[:REPORTS_TO]->(ac);
 
-//Quick Query to Visualize the Graph
-MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 50;
-
-//Link the csv file to the graph 
+// ─────────── 6.  CSV loads ───────────
 
 LOAD CSV WITH HEADERS FROM "https://raw.githubusercontent.com/Icy-Mint/building-graph-chatbot/refs/heads/main/sensor_outputs/room_101_timeseries.csv" AS row
 WITH row,

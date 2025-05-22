@@ -14,9 +14,9 @@ from langchain.prompts import PromptTemplate
 # ────────────────────────────────
 load_dotenv()                                    # pull any .env values into env vars
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-NEO4J_URI = "bolt://18.212.162.197"
-NEO4J_USER = "neo4j"
-NEO4J_PASS = "dependencies-videos-gunnery"
+NEO4J_URI = os.getenv("NEO4J_URI")
+NEO4J_USER = os.getenv("NEO4J_USERNAME")
+NEO4J_PASS = os.getenv("NEO4J_PASSWORD")
 
 # ───── Connect to Neo4j ─────
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
@@ -72,21 +72,28 @@ def ask(query):
 
     query_lower = query.lower()
 
-    if "air conditioning" in query_lower or "ac" in query_lower:
-        result = gh("""
-        MATCH (a:AC_Unit)-[:SERVICED_BY]->(r:Room)
-        RETURN a.ac_id AS ac_unit, collect(r.room_number) AS rooms
-        """)
-        return "\n".join([f"{r['ac_unit']} → Rooms {', '.join(r['rooms'])}" for r in result])
-
-    elif "hot" in query_lower or "temperature" in query_lower:
+    if "hot" in query_lower or "temperature" in query_lower:
         return "\n".join([sh.hottest(room) for room in sh.tables.keys()])
 
     elif "occupy" in query_lower or "occupied" in query_lower:
         return "\n".join([sh.occupancy_pattern(room) for room in sh.tables.keys()])
 
+    elif "air conditioning" in query_lower or "ac" in query_lower:
+        result = gh("""
+        MATCH (a:AC_Unit)-[:SERVICES]->(r:Room)
+        RETURN a.ac_id AS ac_unit, collect(r.room_number) AS rooms
+        ORDER BY a.ac_id
+        """)
+        if not result:
+            return "I couldn’t find any AC-unit → room mapping in the database."
+        return "\n".join(
+            f"{row['ac_unit']} → Rooms {', '.join(map(str, row['rooms']))}"
+            for row in result
+        )
+
     else:
         return chain.run(question=query)
+
 
 
 # ───── STREAMLIT UI ─────
