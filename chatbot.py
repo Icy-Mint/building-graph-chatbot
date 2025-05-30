@@ -76,8 +76,12 @@ parser = StructuredOutputParser.from_response_schemas(response_schemas)
 prompt = PromptTemplate(
     template="""
 You are a smart assistant for building management. 
-Classify the user question into one of 4 actions: temperature, occupancy, ac_mapping, or fallback.
-Also extract room number if present. If not, return null for room.
+Classify the user question into one of the following actions:
+- hottest: user asks about highest, hottest, max temperature
+- coldest: user asks about lowest, coldest, coolest, min temperature
+- occupancy: user asks about room usage or occupancy patterns
+- ac_mapping: user asks which AC unit services which rooms
+- fallback: all other questions
 
 {format_instructions}
 
