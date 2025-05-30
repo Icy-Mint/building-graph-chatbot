@@ -60,6 +60,34 @@ MATCH path = (s:Sensor)-[:RECORDED]->(r:Reading)
 RETURN path
 LIMIT 50
 
+### 📂 Short Description for Chatbot.py
+
+This Streamlit-based chatbot answers building management questions using an LLM classifier (via LangChain) to extract intent (hottest, coldest, occupancy, ac_mapping, fallback) and room number. SensorHelper and GraphHelper handle CSV sensor data and Neo4j queries. The system routes questions to helper functions based on LLM-classified intent, with fallback to LLM for open-ended queries.
+
+## Pros
+
+    Simple, maintainable routing logic.
+
+    LLM handles synonyms and paraphrasing.
+
+    Structured parsing reduces hallucination.
+
+    Efficient hybrid of LLM + Python functions.
+
+    Easily extensible for new actions.
+
+## Cons
+
+    Rigid: pre-defined action labels required.
+
+    Limited for multi-step or complex reasoning.
+
+    LLM only classifies, no dynamic function calling.
+
+    More complex as functions scale.
+
+    No conversation memory or context.
+
 ### 1 . Test this questiona in the chatbot“Which rooms are serviced by which AC units?”
 
 You should see the cypher block in your terminal 
