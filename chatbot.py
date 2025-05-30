@@ -3,16 +3,15 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 from neo4j import GraphDatabase
-from langchain.agents import Tool, initialize_agent
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
-
+from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 
 # ────────────────────────────────
 # 1.  CONFIG
 # ────────────────────────────────
-load_dotenv()                                    # pull any .env values into env vars
+load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_USER = os.getenv("NEO4J_USERNAME")
@@ -27,9 +26,8 @@ class GraphHelper:
             with driver.session() as s:
                 return [r.data() for r in s.run(cypher)]
         except Exception as e:
-            return f"⚠️ Cypher error → {e}"
+            return f"⚠️ Cypher error : {e}"
 
-# ───── Load Time-Series CSVs ─────
 class SensorHelper:
     def __init__(self, folder="sensor_outputs"):
         self.tables = {
@@ -54,47 +52,100 @@ class SensorHelper:
             return f"No occupancy detected in room {room}"
         hours = ", ".join(str(h) + ":00" for h in occ_by_hour.index)
         return f"Room {room} is typically occupied during: {hours}"
+    
+    def coldest(self, room):
+        df = self.tables.get(room)
+        if df is None:
+            return f"No temperature data for room {room}"
+        low = df.loc[df.temperature.idxmin()]
+        return (f"Room {room} reached lowest temperature {low.temperature:.1f} °C "
+                f"on {low.timestamp.strftime('%Y-%m-%d %H:%M')}")
 
-# ───── LLM Setup (optional fallback) ─────
+
+# ───── LLM Setup ─────
 llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, temperature=0)
-prompt = PromptTemplate(input_variables=["question"], template="""
+
+# Structured output parsing schema
+response_schemas = [
+    ResponseSchema(name="action", description="One of: hottest, coldest, occupancy, ac_mapping, fallback"),
+    ResponseSchema(name="room", description="Room number if mentioned, else null")
+]
+parser = StructuredOutputParser.from_response_schemas(response_schemas)
+
+# Classification prompt
+prompt = PromptTemplate(
+    template="""
+You are a smart assistant for building management. 
+Classify the user question into one of 4 actions: temperature, occupancy, ac_mapping, or fallback.
+Also extract room number if present. If not, return null for room.
+
+{format_instructions}
+
+User question: {question}
+""",
+    input_variables=["question"],
+    partial_variables={"format_instructions": parser.get_format_instructions()}
+)
+
+classification_chain = LLMChain(llm=llm, prompt=prompt)
+fallback_chain = LLMChain(
+    llm=llm,
+    prompt=PromptTemplate(input_variables=["question"], template="""
 You're a smart assistant for building management.
 Answer the following user question based on building layout and sensor data:
 
 {question}
 """)
-chain = LLMChain(llm=llm, prompt=prompt)
+)
 
 # ───── Chatbot Entry Point ─────
 def ask(query):
     gh = GraphHelper()
     sh = SensorHelper()
 
-    query_lower = query.lower()
+    try:
+        parsed = parser.parse(classification_chain.run(question=query))
+        action = parsed['action']
+        room = parsed.get('room')
 
-    if "hot" in query_lower or "temperature" in query_lower:
-        return "\n".join([sh.hottest(room) for room in sh.tables.keys()])
+        if action == "hottest":
+            if room and room in sh.tables:
+                return sh.hottest(room)
+            else:
+                return "\n".join([sh.hottest(r) for r in sh.tables.keys()])
 
-    elif "occupy" in query_lower or "occupied" in query_lower:
-        return "\n".join([sh.occupancy_pattern(room) for room in sh.tables.keys()])
+        elif action == "coldest":
+            if room and room in sh.tables:
+                return sh.coldest(room)
+            else:
+                return "\n".join([sh.coldest(r) for r in sh.tables.keys()])
 
-    elif "air conditioning" in query_lower or "ac" in query_lower:
-        result = gh("""
-        MATCH (a:AC_Unit)-[:SERVICES]->(r:Room)
-        RETURN a.ac_id AS ac_unit, collect(r.room_number) AS rooms
-        ORDER BY a.ac_id
-        """)
-        if not result:
-            return "I couldn’t find any AC-unit → room mapping in the database."
-        return "\n".join(
-            f"{row['ac_unit']} → Rooms {', '.join(map(str, row['rooms']))}"
-            for row in result
-        )
+        elif action == "occupancy":
+            if room and room in sh.tables:
+                return sh.occupancy_pattern(room)
+            else:
+                return "\n".join([sh.occupancy_pattern(r) for r in sh.tables.keys()])
 
-    else:
-        return chain.run(question=query)
+        elif action == "ac_mapping":
+            result = gh("""
+            MATCH (a:AC_Unit)-[:SERVICES]->(r:Room)
+            RETURN a.ac_id AS ac_unit, collect(r.room_number) AS rooms
+            ORDER BY a.ac_id
+            """)
+            if not isinstance(result, list):
+                return result
+            if len(result) == 0:
+                return "I couldn’t find any AC-unit to room mapping."
+            return "\n".join(
+                f"AC unit {row['ac_unit']} serves rooms: {', '.join(map(str, row['rooms']))}."
+                for row in result
+            )
 
+        else:
+            return fallback_chain.run(question=query)
 
+    except Exception as e:
+        return f"❌ Failed to classify query: {e}"
 
 # ───── STREAMLIT UI ─────
 st.set_page_config(page_title="Dorm Building Chatbot", page_icon="🏢", layout="wide")
