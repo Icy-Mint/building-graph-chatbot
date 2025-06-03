@@ -86,7 +86,7 @@ chain = GraphCypherQAChain.from_llm(
     graph=graph,
     cypher_prompt=custom_prompt,  # add custom prompt to allow more flexible question 
     top_k=50,
-    execute_on_graph=False,   # generate only
+    execute_on_graph=True,   # execution 
     allow_dangerous_requests=True,  # allow the direct access to the database
     verbose=True,
 )
@@ -211,34 +211,33 @@ if user_q:
             with st.spinner("Thinking…"):
                 resp = chain.invoke({"query": user_q})
 
-            #  get the raw text
-            cypher = resp.get("cypher", "").strip()
+            cypher  = resp.get("cypher")
+            answer  = resp.get("result", "")
 
-            #  strip any leading “Cypher:” the model might add
-            if cypher.lower().startswith("cypher:"):
-                cypher = cypher.split(":", 1)[1].lstrip()
+            shown_cypher = cypher.strip() if cypher else "(executed directly — no raw Cypher returned)"
+            with st.expander(" Generated Cypher"):
+                st.code(shown_cypher, language="cypher")
 
-            if cypher.lower().startswith("cannot answer"):
-                st.warning("The LLM says the question can’t be answered with the current schema.")
-                st.stop()
-
-
-            answer = resp.get("result", "")
-
-            with st.expander("🧠 Generated Cypher"):
-                st.code(cypher or "—", language="cypher")
-
-            if cypher.lower().startswith(("match", "with", "call")):
-                rows = graph.query(cypher)
-                if rows:
-                    st.success("Answer:")
-                    st.dataframe(pd.DataFrame(rows))
+            if answer:
+                st.success("Answer:")
+                if isinstance(answer, list):
+                    try:
+                        st.dataframe(pd.DataFrame(answer))
+                    except Exception:
+                        st.write(answer)
                 else:
-                    st.info(answer or "(no rows returned)")
+                    st.write(answer)
             else:
-                st.warning("⚠️Can't be answered with the current schema.")
-                if answer:
-                    st.info(answer)
+                if cypher and cypher.lower().startswith(("match", "with", "call")):
+                    rows = graph.query(cypher)
+                    if rows:
+                        st.success("Answer:")
+                        st.dataframe(pd.DataFrame(rows))
+                    else:
+                        st.info("(no rows returned)")
+                else:
+                    st.warning(" The LLM says the question can’t be answered with the current schema.")
 
+    # closes the big `try:` that started earlier
     except Exception as err:
-        st.error(f"❌ Something went wrong:\n\n{err}")
+        st.error(f" Something went wrong:\n\n{err}")
