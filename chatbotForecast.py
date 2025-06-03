@@ -211,8 +211,18 @@ if user_q:
             with st.spinner("Thinking…"):
                 resp = chain.invoke({"query": user_q})
 
-            cypher  = resp.get("cypher")
-            answer  = resp.get("result", "")
+            cypher_raw = resp.get("cypher")          # may be None
+            cypher     = cypher_raw.strip() if cypher_raw else ""   # safe strip
+
+            answer_raw = resp.get("result")          # may also be None
+            answer     = answer_raw or ""            # empty‑string fallback
+
+            # tidy up the Cypher (remove extra space)
+            cypher = re.sub(r"'\s*([\w-]+)\s*'", r"'\1'", cypher)
+
+            # treat the chain’s stock apology as “no answer” when the chain produces that boiler‑plate apology, it’s ignored, so execution continues 
+            if isinstance(answer, str) and answer.lower().startswith("i'm sorry"):
+                answer = ""                           # force the fallback path
 
             shown_cypher = cypher.strip() if cypher else "(executed directly — no raw Cypher returned)"
             with st.expander(" Generated Cypher"):
