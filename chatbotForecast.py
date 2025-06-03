@@ -4,6 +4,11 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_community.graphs import Neo4jGraph
 from langchain_community.chains.graph_qa.cypher import GraphCypherQAChain
+from langchain.prompts import PromptTemplate
+
+# Add a better system prompt that includes the schema
+from langchain.prompts import PromptTemplate
+
 
 try:
     from pyvis.network import Network
@@ -26,15 +31,66 @@ llm = ChatOpenAI(
     temperature=0,
     openai_api_key=os.getenv("OPENAI_API_KEY"),
 )
+# add database schema to guide the cipher generation 
+schema = """
+Node Labels:
+- Room: properties room_number (string), type ('dorm' or 'mechanical')
+- AC_Unit: properties ac_id (string, values like 'AC1', 'AC2')
+- Room (property: room_number, example values: '101', '102', '103')
+- Sensor: properties sensor_id (string), sensor_type ('occupancy' or 'temperature')
+- Reading: properties timestamp, value
 
+Relationships:
+- (Room)-[:CONTAINS]->(AC_Unit): Mechanical rooms contain AC units.
+- (AC_Unit)-[:SERVICES]->(Room): AC units service dorm rooms.
+- (Room)-[:HAS_SENSOR]->(Sensor): Rooms have sensors.
+- (Sensor)-[:REPORTS_TO]->(AC_Unit): Temperature sensors report to their AC unit.
+- (Sensor)-[:RECORDED]->(Reading) : Reading reported by sensors 
+"""
+# Put few shots for LLM synonym mapping 
+few_shot = """Examples (AC-unit synonyms):
+User: Which rooms have AC1?
+MATCH (a:AC_Unit {{ac_id:'AC1'}})-[:SERVICES]->(r:Room)
+RETURN r.room_number
+
+User: What rooms are serviced by air conditioning unit 2?
+MATCH (a:AC_Unit {{ac_id:'AC2'}})-[:SERVICES]->(r:Room)
+RETURN r.room_number
+"""
+
+# ---- build one resolved string, but keep {{question}} placeholder ----------
+full_prompt_str = f"""
+You are a Cypher query generator for Neo4j.
+
+The database schema is:
+
+{schema} 
+
+Guidelines:
+•  When the user says "air conditioning unit N", "AC N", "acN", "ac N", etc., map it to ac_id = 'ACN'.
+•  Use relationship directions exactly as shown.
+•  Use correct property names (e.g. ac_id, room_number, sensor_id).
+•  If the question can't be answered with the schema, reply ONLY: "Cannot answer with the current schema."
+•  Output **only** the Cypher statement – no prefixes, no code fences.
+{few_shot}
+
+Now answer **this question** (generate only Cypher, no prose):
+Question: {{query}}
+"""
+
+custom_prompt = PromptTemplate.from_template(full_prompt_str)
+
+# Build chain with strong schema injection
 chain = GraphCypherQAChain.from_llm(
     llm=llm,
     graph=graph,
+    cypher_prompt=custom_prompt,  # add custom prompt to allow more flexible question 
     top_k=50,
-    execute_on_graph=False,          # generate only
-    allow_dangerous_requests=True,
+    execute_on_graph=False,   # generate only
+    allow_dangerous_requests=True,  # allow the direct access to the database
     verbose=True,
 )
+
 
 FORECAST_WORDS = re.compile(r"\b(forecast|predict|projection|trend)\b", re.I)
 
@@ -53,7 +109,7 @@ user_q = col_q.text_input("Ask about rooms, AC units, or sensors:")
 if col_btn.button("🔎 Preview Graph"):
 
     if not HAS_PYVIS:
-        st.error("Install `pyvis` (`pip install pyvis`) to enable the preview.")
+        st.error("Install`pyvis`(`pip install pyvis`) to enable the preview.")
     else:
         with st.spinner("Loading…"):
             data = graph.query(
@@ -85,7 +141,7 @@ if user_q:
         # ────────────────────────────────
         if FORECAST_WORDS.search(user_q):
 
-            st.warning("⛅️ Forecasting isn't a pure Cypher lookup; fetching history…")
+            st.warning("⛅️Forecasting isn't a pure Cypher lookup; fetching history…")
 
             with st.spinner("Querying Neo4j…"):
                 rows = graph.query(
@@ -155,7 +211,18 @@ if user_q:
             with st.spinner("Thinking…"):
                 resp = chain.invoke({"query": user_q})
 
+            #  get the raw text
             cypher = resp.get("cypher", "").strip()
+
+            #  strip any leading “Cypher:” the model might add
+            if cypher.lower().startswith("cypher:"):
+                cypher = cypher.split(":", 1)[1].lstrip()
+
+            if cypher.lower().startswith("cannot answer"):
+                st.warning("The LLM says the question can’t be answered with the current schema.")
+                st.stop()
+
+
             answer = resp.get("result", "")
 
             with st.expander("🧠 Generated Cypher"):
