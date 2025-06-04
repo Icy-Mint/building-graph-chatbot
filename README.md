@@ -149,7 +149,7 @@ This Streamlit-based chatbot answers building management questions using an LLM 
 
     No conversation memory or context.
 
-### 📂 `chatbotForecast.py` — Streamlit + Neo4j demo
+### 📂 Short Description for chatbotForecast.py
 
 A single‑page **Streamlit** app that converts plain‑English questions about rooms, AC‑units, temperatures, and occupancy into live **Cypher** queries on Neo4j.  
 For “forecast‑style” prompts it adds a minimal occupancy‑prediction workflow.
