@@ -22,7 +22,7 @@ This repo shows how to combine **Neo4j**, **LangChain + OpenAI**, and **Stre
 ├── LICENSE
 └── README.md                # You’re reading it 🙂
 ```
-### 🏗️ 1 · Load the Knowledge Graph
+###  1 · Load the Knowledge Graph
 
 > **Prerequisite**  Neo4j 5.x (Aura, Desktop, or self‑hosted)
 
@@ -59,7 +59,7 @@ This project includes synthetic sensor data used for the graph demo:
 Copy the template using the code below to start build your own knowledge graph:
 cp .env.template .env
 
-### 🧪 2 · Sanity‑check the Graph
+###  2 · Sanity‑check the Graph
 
 Paste the Cypher snippets below into **Neo4j Browser** (or `cypher-shell`) to
 verify that the demo graph is loaded correctly.
@@ -85,7 +85,7 @@ LIMIT 50
 
 ---
 
-## 🛠️ Tested With
+##  Tested With
 
 | Tool        | Version |
 |-------------|---------|
@@ -97,7 +97,7 @@ LIMIT 50
 
 ---
 
-## 🚀 Quick One‑Liner (zero‑to‑chatbot)
+## Quick One‑Liner (zero‑to‑chatbot)
 
 ```bash
 pip install -r requirements.txt && \
@@ -156,7 +156,7 @@ For “forecast‑style” prompts it adds a minimal occupancy‑prediction work
 
 ---
 
-## ✨ Features at a glance
+##  Features at a glance
 
 | Category                | What it does |
 |-------------------------|--------------|
@@ -168,7 +168,7 @@ For “forecast‑style” prompts it adds a minimal occupancy‑prediction work
 
 ---
 
-### 🔍 How it works (under the hood)
+###  How it works (under the hood)
 
 1. **Natural‑language → Cypher**  
    * LangChain’s `GraphCypherQAChain` + GPT‑4 are primed with a full schema & few‑shot examples.  
