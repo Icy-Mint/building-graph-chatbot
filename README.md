@@ -127,27 +127,19 @@ This Streamlit-based chatbot answers building management questions using an LLM 
 
 ## Pros
 
-    Simple, maintainable routing logic.
-
-    LLM handles synonyms and paraphrasing.
-
-    Structured parsing reduces hallucination.
-
-    Efficient hybrid of LLM + Python functions.
-
-    Easily extensible for new actions.
+* Simple, maintainable routing logic.
+* LLM handles synonyms and paraphrasing.
+* Structured parsing reduces hallucination.
+* Efficient hybrid of LLM + Python functions.
+* Easily extensible for new actions.
 
 ## Cons
 
-    Rigid: pre-defined action labels required.
-
-    Limited for multi-step or complex reasoning.
-
-    LLM only classifies, no dynamic function calling.
-
-    More complex as functions scale.
-
-    No conversation memory or context.
+* Rigid: pre-defined action labels required.
+* Limited for multi-step or complex reasoning.
+* LLM only classifies, no dynamic function calling.
+* More complex as functions scale.
+* No conversation memory or context.
 
 ### 📂 Short Description for chatbotForecast.py
 
