@@ -177,9 +177,10 @@ cython_debug/
 # Custom for Graph Database Demo
 # ------------------------------
 
-# Environment variable templates 
+# Environment variable templates
+# (allow sharing a safe template)
 .env.*
-!.env.template  # allow sharing a safe template
+!.env.template
 
 # CSV demo data – keep these in the repo!
 # (do NOT ignore if you want them tracked)
