@@ -16,6 +16,7 @@ This repo shows how to combine **Neo4j**, **LangChain + OpenAI**, and **Stre
 ├── chatbot.py               # v1 – intent‑classifier chatbot
 ├── chatbotForecast.py       # v2 – GraphCypherQAChain Streamlit app (main demo)
 ├── Graph.cypher             # Schema + seed data for Neo4j
+├── Visualize.cypher         # Read-only queries to view the loaded graph
 ├── SensorDataGeneration.py  # Script to create synthetic sensor CSVs
 ├── requirements.txt         # Python deps
 ├── .env.template            # Copy → `.env` and fill in secrets
@@ -84,11 +85,8 @@ MATCH path = (s:Sensor)-[:RECORDED]->(r:Reading)
 RETURN path
 LIMIT 50
 
-- `Visualize the whole graph` (switch the results panel to the **Graph** view)
-MATCH (n) RETURN n LIMIT 100
-
-- `Visualize structure only` (skips the high-volume `Reading` nodes so Room/AC_Unit/Sensor relationships are easy to see)
-MATCH (a)-[r]->(b) WHERE NOT b:Reading RETURN a, r, b
+To actually *see* the graph (switch the results panel to the **Graph** view),
+run the queries in [`Visualize.cypher`](./Visualize.cypher).
 
 > **Note**  
 > The code assumes a Neo4j graph with nodes & relationships exactly as defined in the embedded schema string.
