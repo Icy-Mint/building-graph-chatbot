@@ -2,8 +2,11 @@
 """Streamlit chatbot that answers building-sensor questions by generating and
 executing Cypher against a Neo4j graph (GraphCypherQAChain), with a hardcoded
 fallback path for forecast-style questions."""
+import json
 import os
 import re
+import time
+from datetime import datetime, timezone
 
 import pandas as pd
 import streamlit as st
@@ -20,6 +23,39 @@ except ModuleNotFoundError:
     HAS_PYVIS = False
 
 load_dotenv()
+
+# ─────────────────────────────────────────
+# 1a.  ENV VALIDATION & PROVIDER SELECTION
+# ─────────────────────────────────────────
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
+
+_DEFAULT_MODELS = {
+    "openai": "gpt-4",
+    "gemini": "gemini-2.0-flash",
+    "groq": "llama-3.3-70b-versatile",
+}
+_PROVIDER_API_KEY_ENV = {
+    "openai": "OPENAI_API_KEY",
+    "gemini": "GOOGLE_API_KEY",
+    "groq": "GROQ_API_KEY",
+}
+
+LLM_MODEL_NAME = os.getenv("LLM_MODEL") or _DEFAULT_MODELS.get(LLM_PROVIDER)
+
+
+def require_env_vars() -> None:
+    """Fail fast with one clear message instead of a library stack trace
+    three layers deep inside Neo4jGraph/ChatOpenAI construction."""
+    required = ["NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD"]
+    key_env = _PROVIDER_API_KEY_ENV.get(LLM_PROVIDER)
+    if key_env:
+        required.append(key_env)
+    missing = [name for name in required if not os.getenv(name)]
+    if missing:
+        raise RuntimeError(
+            "Missing required environment variable(s): " + ", ".join(missing) +
+            ". Copy .env.template to .env and fill them in."
+        )
 
 # ─────────────────────────────────────────
 # 1.  SCHEMA & PROMPT  (pure strings, no side effects — safe to import)
@@ -115,21 +151,12 @@ def get_graph() -> Neo4jGraph:
     )
 
 
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
-
-_DEFAULT_MODELS = {
-    "openai": "gpt-4",
-    "gemini": "gemini-2.0-flash",
-    "groq": "llama-3.3-70b-versatile",
-}
-
-
 def _build_llm():
     """Pick the chat model from LLM_PROVIDER (openai/gemini/groq) so the same
     chain/prompt can be benchmarked across providers without touching the app
     logic. The non-default providers are imported lazily so you don't need
     their packages installed unless you actually use them."""
-    model = os.getenv("LLM_MODEL") or _DEFAULT_MODELS.get(LLM_PROVIDER)
+    model = LLM_MODEL_NAME
 
     if LLM_PROVIDER == "openai":
         return ChatOpenAI(model=model, temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
@@ -169,9 +196,21 @@ def _looks_like_apology(text) -> bool:
     return isinstance(text, str) and text.lower().startswith(("i'm sorry", "cannot answer"))
 
 
-def ask_graph(question: str, chain: GraphCypherQAChain, graph: Neo4jGraph, max_retries: int = MAX_CYPHER_RETRIES):
+def ask_graph(
+    question: str,
+    chain: GraphCypherQAChain,
+    graph: Neo4jGraph,
+    max_retries: int = MAX_CYPHER_RETRIES,
+    on_attempt=None,
+):
     """Run the Cypher QA chain, retrying once by feeding the failure back to the LLM
-    instead of silently forcing execution or swallowing the failure."""
+    instead of silently forcing execution or swallowing the failure.
+
+    on_attempt, if given, is called as on_attempt(attempt_index, cypher, error)
+    after each attempt (error is None on success) — used to log per-attempt
+    detail without changing this function's (cypher, result, error) return
+    shape that callers and tests already rely on.
+    """
     attempt_q = question
     cypher, error = "", None
 
@@ -189,6 +228,8 @@ def ask_graph(question: str, chain: GraphCypherQAChain, graph: Neo4jGraph, max_r
         answer = "" if _looks_like_apology(answer_raw) else (answer_raw or "")
 
         if answer:
+            if on_attempt:
+                on_attempt(attempt, cypher, None)
             return cypher, answer, None
 
         rows = None
@@ -198,10 +239,15 @@ def ask_graph(question: str, chain: GraphCypherQAChain, graph: Neo4jGraph, max_r
             except Exception as e:
                 error = str(e)
             if rows:
+                if on_attempt:
+                    on_attempt(attempt, cypher, None)
                 return cypher, rows, None
             error = error or "Query executed but returned 0 rows."
         else:
             error = error or "The model did not produce a usable Cypher query."
+
+        if on_attempt:
+            on_attempt(attempt, cypher, error)
 
         if attempt < max_retries:
             attempt_q = (
@@ -215,22 +261,43 @@ def ask_graph(question: str, chain: GraphCypherQAChain, graph: Neo4jGraph, max_r
 
 
 # ─────────────────────────────────────────
-# 4.  STREAMLIT UI
+# 4.  OBSERVABILITY
+# One JSONL record per question — the data source for building an accuracy
+# eval set and comparing providers later, not just a debug print.
+# ─────────────────────────────────────────
+LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "qa_log.jsonl")
+
+
+def log_interaction(entry: dict) -> None:
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    with open(LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+
+
+# ─────────────────────────────────────────
+# 5.  STREAMLIT UI
 # Only runs under `streamlit run chatbotForecast.py` — importing this module
 # (e.g. from a test) no longer builds a chain or opens a Neo4j connection.
 # ─────────────────────────────────────────
 def main():
+    st.set_page_config("Building Sensor Chatbot", "🏢")
+
+    try:
+        require_env_vars()
+    except RuntimeError as e:
+        st.error(str(e))
+        st.stop()
+
     graph = get_graph()
     chain = get_chain()
 
-    st.set_page_config("Building Sensor Chatbot", "🏢")
     st.title("🏢 Sensor Graph")
 
     col_q, col_btn = st.columns([3, 1])
     user_q = col_q.text_input("Ask about rooms, AC units, or sensors:")
 
     # ─────────────────────────────────────────
-    # 4a.  Quick graph preview button
+    # 5a.  Quick graph preview button
     # ─────────────────────────────────────────
     if col_btn.button("🔎 Preview Graph"):
 
@@ -258,7 +325,7 @@ def main():
                 st.components.v1.html(open("mini_graph.html").read(), height=620, scrolling=True)
 
     # ─────────────────────────────────────────
-    # 4b.  Handle the user question
+    # 5b.  Handle the user question
     # ─────────────────────────────────────────
     if user_q:
         try:
@@ -334,8 +401,28 @@ def main():
             # Plain‑Cypher questions
             # ────────────────────────────────
             else:
+                attempts_log = []
+                start_time = time.time()
                 with st.spinner("Thinking…"):
-                    cypher, result, error = ask_graph(user_q, chain, graph)
+                    cypher, result, error = ask_graph(
+                        user_q, chain, graph,
+                        on_attempt=lambda i, c, e: attempts_log.append(
+                            {"attempt": i, "cypher": c, "error": e}
+                        ),
+                    )
+
+                log_interaction({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "question": user_q,
+                    "provider": LLM_PROVIDER,
+                    "model": LLM_MODEL_NAME,
+                    "outcome": "success" if result else "failed",
+                    "final_cypher": cypher,
+                    "final_error": error,
+                    "retries": max(len(attempts_log) - 1, 0),
+                    "latency_ms": round((time.time() - start_time) * 1000),
+                    "attempts": attempts_log,
+                })
 
                 shown_cypher = cypher if cypher else "(no Cypher generated)"
                 with st.expander(" Generated Cypher"):

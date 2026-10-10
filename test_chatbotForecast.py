@@ -1,9 +1,14 @@
-"""Unit tests for ask_graph's retry/error-handling logic.
+"""Unit tests for ask_graph's retry/error-handling logic, plus the env-var
+validation helper.
 
 These run entirely offline: chain/graph are fakes with scripted return
 values, so no live Neo4j instance and no OpenAI key are needed.
 """
-from chatbotForecast import ask_graph
+import os
+
+import pytest
+
+from chatbotForecast import ask_graph, require_env_vars, _PROVIDER_API_KEY_ENV
 
 
 class FakeChain:
@@ -132,3 +137,62 @@ def test_max_retries_zero_disables_retry():
 
     assert result is None
     assert len(chain.calls) == 1  # no retry attempted
+
+
+def test_on_attempt_fires_once_per_attempt_with_error_or_none():
+    good_cypher = "MATCH (r:Room) RETURN r.room_number"
+    chain = FakeChain([
+        {"cypher": "", "result": "I'm sorry, I cannot answer that."},
+        {"cypher": good_cypher, "result": None},
+    ])
+    graph = FakeGraph(rows_by_cypher={good_cypher: [{"room_number": "104"}]})
+    seen = []
+
+    ask_graph("q", chain, graph, on_attempt=lambda i, c, e: seen.append((i, c, e)))
+
+    assert len(seen) == 2
+    assert seen[0][0] == 0 and seen[0][2] is not None  # first attempt failed, error recorded
+    assert seen[1][0] == 1 and seen[1][2] is None       # second attempt succeeded, no error
+
+
+# ───────────────────────────────────────────────────────────────────────
+# require_env_vars
+# ───────────────────────────────────────────────────────────────────────
+
+def test_require_env_vars_passes_when_all_set(monkeypatch):
+    monkeypatch.setenv("NEO4J_URI", "bolt://x")
+    monkeypatch.setenv("NEO4J_USERNAME", "neo4j")
+    monkeypatch.setenv("NEO4J_PASSWORD", "pw")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    import chatbotForecast
+    monkeypatch.setattr(chatbotForecast, "LLM_PROVIDER", "openai")
+
+    require_env_vars()  # should not raise
+
+
+def test_require_env_vars_lists_every_missing_var(monkeypatch):
+    for name in ["NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD", "OPENAI_API_KEY"]:
+        monkeypatch.delenv(name, raising=False)
+    import chatbotForecast
+    monkeypatch.setattr(chatbotForecast, "LLM_PROVIDER", "openai")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        require_env_vars()
+
+    message = str(exc_info.value)
+    for name in ["NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD", "OPENAI_API_KEY"]:
+        assert name in message
+
+
+def test_require_env_vars_checks_the_active_providers_key(monkeypatch):
+    monkeypatch.setenv("NEO4J_URI", "bolt://x")
+    monkeypatch.setenv("NEO4J_USERNAME", "neo4j")
+    monkeypatch.setenv("NEO4J_PASSWORD", "pw")
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    import chatbotForecast
+    monkeypatch.setattr(chatbotForecast, "LLM_PROVIDER", "gemini")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        require_env_vars()
+
+    assert "GOOGLE_API_KEY" in str(exc_info.value)

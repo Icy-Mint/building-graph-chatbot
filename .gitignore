@@ -188,6 +188,12 @@ cython_debug/
 # Neo4j local DB or import/export artifacts (if using Neo4j Desktop)
 *.dump
 *.db
+
+# Runtime logs from chatbotForecast.py (per-question Cypher/outcome log)
+logs/
+
+# pyvis preview output written by the "Preview Graph" button
+mini_graph.html
 *.log
 import/
 logs/
