@@ -29,16 +29,9 @@ This repo shows how to combine **Neo4j**, **LangChain + OpenAI**, and **Stre
 1. **Create a database** and note the Bolt URI, user, and password.  
 2. **Run `Graph.cypher`** in Neo4j Browser or `cypher-shell`.
 
-
-> **If it reports success but a later `MATCH` query shows no data:** some
-> lightweight query editors (e.g. Aura's embedded "Query" tab) only reliably
-> execute one statement per submission, and will silently run just the first
-> one (the harmless `MATCH (n) DETACH DELETE n;` wipe) when you paste the
-> whole multi-statement file at once. If that happens, run `Graph.cypher`'s
-> sections one block at a time instead, checking `MATCH (n) RETURN count(n);`
-> after each. The full standalone Neo4j Browser (`browser.neo4j.io`, linked
-> from Aura's "Connect" button) handles multi-statement scripts more
-> reliably than the embedded editor.
+> Success but `MATCH (n) RETURN count(n);` shows 0? Some lightweight editors
+> (e.g. Aura's "Query" tab) only run the first statement of a pasted script —
+> run `Graph.cypher` block by block instead.
 
 #### Graph schema at‑a‑glance
 
