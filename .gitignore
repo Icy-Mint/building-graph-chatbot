@@ -189,7 +189,7 @@ cython_debug/
 *.dump
 *.db
 
-# Runtime logs from chatbotForecast.py (per-question Cypher/outcome log)
+# Runtime logs from chatbot.py / chatbotForecast.py (per-question outcome logs)
 logs/
 
 # pyvis preview output written by the "Preview Graph" button
