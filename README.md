@@ -29,6 +29,17 @@ This repo shows how to combine **Neo4j**, **LangChain + OpenAI**, and **Stre
 1. **Create a database** and note the Bolt URI, user, and password.  
 2. **Run `Graph.cypher`** in Neo4j Browser or `cypher-shell`.
 
+
+> **If it reports success but a later `MATCH` query shows no data:** some
+> lightweight query editors (e.g. Aura's embedded "Query" tab) only reliably
+> execute one statement per submission, and will silently run just the first
+> one (the harmless `MATCH (n) DETACH DELETE n;` wipe) when you paste the
+> whole multi-statement file at once. If that happens, run `Graph.cypher`'s
+> sections one block at a time instead, checking `MATCH (n) RETURN count(n);`
+> after each. The full standalone Neo4j Browser (`browser.neo4j.io`, linked
+> from Aura's "Connect" button) handles multi-statement scripts more
+> reliably than the embedded editor.
+
 #### Graph schema at‑a‑glance
 
 | Node       | Key properties                                  | Purpose              |
@@ -79,6 +90,12 @@ RETURN path
 MATCH path = (s:Sensor)-[:RECORDED]->(r:Reading)
 RETURN path
 LIMIT 50
+
+- `Visualize the whole graph` (switch the results panel to the **Graph** view)
+MATCH (n) RETURN n LIMIT 100
+
+- `Visualize structure only` (skips the high-volume `Reading` nodes so Room/AC_Unit/Sensor relationships are easy to see)
+MATCH (a)-[r]->(b) WHERE NOT b:Reading RETURN a, r, b
 
 > **Note**  
 > The code assumes a Neo4j graph with nodes & relationships exactly as defined in the embedded schema string.
