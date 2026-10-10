@@ -136,6 +136,23 @@ FORECAST_WORDS = re.compile(
 
 MAX_CYPHER_RETRIES = 1
 
+# Blocks write clauses in any Cypher before it reaches the database. Needed
+# because GraphCypherQAChain executes LLM-generated Cypher *internally*
+# (self.graph.query(...) inside its _call()) before ask_graph ever sees it,
+# so a check placed only in our own fallback-execution code would be too
+# late. Aura's free tier has no per-role access control (that's an Enterprise
+# feature), so this is the only read-only enforcement available without
+# upgrading or self-hosting — it's app-level, not a substitute for a real
+# read-only DB role if one becomes available.
+WRITE_CLAUSE_RE = re.compile(r"\b(CREATE|MERGE|DELETE|SET|REMOVE|DROP)\b", re.I)
+
+
+def ensure_read_only_cypher(cypher_query: str) -> None:
+    if WRITE_CLAUSE_RE.search(cypher_query):
+        raise PermissionError(
+            f"Refusing to execute a non-read-only Cypher statement: {cypher_query!r}"
+        )
+
 
 # ─────────────────────────────────────────
 # 2.  RESOURCES
@@ -144,11 +161,22 @@ MAX_CYPHER_RETRIES = 1
 # ─────────────────────────────────────────
 @st.cache_resource
 def get_graph() -> Neo4jGraph:
-    return Neo4jGraph(
+    graph = Neo4jGraph(
         url=os.getenv("NEO4J_URI"),
         username=os.getenv("NEO4J_USERNAME"),
         password=os.getenv("NEO4J_PASSWORD"),
     )
+
+    unguarded_query = graph.query
+
+    def guarded_query(cypher_query, *args, **kwargs):
+        ensure_read_only_cypher(cypher_query)
+        return unguarded_query(cypher_query, *args, **kwargs)
+
+    graph.query = guarded_query  # instance-level override; every caller (the
+    # chain's internal execution, ask_graph's fallback execution, and main()'s
+    # own hardcoded queries) goes through this same guarded method.
+    return graph
 
 
 def _build_llm():

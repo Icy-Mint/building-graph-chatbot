@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-from chatbotForecast import ask_graph, require_env_vars, _PROVIDER_API_KEY_ENV
+from chatbotForecast import ask_graph, require_env_vars, ensure_read_only_cypher, _PROVIDER_API_KEY_ENV
 
 
 class FakeChain:
@@ -196,3 +196,30 @@ def test_require_env_vars_checks_the_active_providers_key(monkeypatch):
         require_env_vars()
 
     assert "GOOGLE_API_KEY" in str(exc_info.value)
+
+
+# ───────────────────────────────────────────────────────────────────────
+# ensure_read_only_cypher
+# ───────────────────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("cypher", [
+    "MATCH (r:Room) RETURN r.room_number",
+    "MATCH (r:Room {room_number:'101'})-[:HAS_SENSOR]->(s:Sensor) RETURN s",
+    "MATCH (a:AC_Unit)-[:SERVICES]->(r:Room) RETURN r.room_number ORDER BY r.room_number LIMIT 5",
+])
+def test_ensure_read_only_cypher_allows_real_read_queries(cypher):
+    ensure_read_only_cypher(cypher)  # should not raise
+
+
+@pytest.mark.parametrize("cypher", [
+    "MATCH (r:Room) DETACH DELETE r",
+    "MATCH (r:Room) DELETE r",
+    "CREATE (r:Room {room_number:'999'})",
+    "MATCH (r:Room {room_number:'101'}) SET r.type = 'mechanical'",
+    "MATCH (r:Room {room_number:'101'}) REMOVE r.type",
+    "MERGE (r:Room {room_number:'999'})",
+    "DROP INDEX room_number_index",
+])
+def test_ensure_read_only_cypher_blocks_write_clauses(cypher):
+    with pytest.raises(PermissionError):
+        ensure_read_only_cypher(cypher)
