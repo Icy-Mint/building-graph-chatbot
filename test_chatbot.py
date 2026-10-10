@@ -169,6 +169,8 @@ def test_require_env_vars_passes_when_all_set(monkeypatch):
     monkeypatch.setenv("NEO4J_USERNAME", "neo4j")
     monkeypatch.setenv("NEO4J_PASSWORD", "pw")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    import chatbot
+    monkeypatch.setattr(chatbot, "LLM_PROVIDER", "openai")
 
     require_env_vars()  # should not raise
 
@@ -176,6 +178,8 @@ def test_require_env_vars_passes_when_all_set(monkeypatch):
 def test_require_env_vars_lists_every_missing_var(monkeypatch):
     for name in ["NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD", "OPENAI_API_KEY"]:
         monkeypatch.delenv(name, raising=False)
+    import chatbot
+    monkeypatch.setattr(chatbot, "LLM_PROVIDER", "openai")
 
     with pytest.raises(RuntimeError) as exc_info:
         require_env_vars()
@@ -183,3 +187,17 @@ def test_require_env_vars_lists_every_missing_var(monkeypatch):
     message = str(exc_info.value)
     for name in ["NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD", "OPENAI_API_KEY"]:
         assert name in message
+
+
+def test_require_env_vars_checks_the_active_providers_key(monkeypatch):
+    monkeypatch.setenv("NEO4J_URI", "bolt://x")
+    monkeypatch.setenv("NEO4J_USERNAME", "neo4j")
+    monkeypatch.setenv("NEO4J_PASSWORD", "pw")
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    import chatbot
+    monkeypatch.setattr(chatbot, "LLM_PROVIDER", "gemini")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        require_env_vars()
+
+    assert "GOOGLE_API_KEY" in str(exc_info.value)

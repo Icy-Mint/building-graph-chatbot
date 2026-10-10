@@ -22,15 +22,54 @@ load_dotenv()
 
 SENSOR_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sensor_outputs")
 
+# Same provider-swap as chatbotForecast.py, so the two bots can be benchmarked
+# on the same LLM without code changes.
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
+
+_DEFAULT_MODELS = {
+    "openai": "gpt-4",
+    "gemini": "gemini-3.8-flash",
+    "groq": "llama-3.3-70b-versatile",
+}
+_PROVIDER_API_KEY_ENV = {
+    "openai": "OPENAI_API_KEY",
+    "gemini": "GOOGLE_API_KEY",
+    "groq": "GROQ_API_KEY",
+}
+
+LLM_MODEL_NAME = os.getenv("LLM_MODEL") or _DEFAULT_MODELS.get(LLM_PROVIDER)
+
 
 def require_env_vars() -> None:
-    required = ["NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD", "OPENAI_API_KEY"]
+    required = ["NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD"]
+    key_env = _PROVIDER_API_KEY_ENV.get(LLM_PROVIDER)
+    if key_env:
+        required.append(key_env)
     missing = [name for name in required if not os.getenv(name)]
     if missing:
         raise RuntimeError(
             "Missing required environment variable(s): " + ", ".join(missing) +
             ". Copy .env.template to .env and fill them in."
         )
+
+
+def _build_llm():
+    """Pick the chat model from LLM_PROVIDER (openai/gemini/groq). Non-default
+    providers are imported lazily so their packages are only needed if used."""
+    model = LLM_MODEL_NAME
+
+    if LLM_PROVIDER == "openai":
+        return ChatOpenAI(model=model, temperature=0, openai_api_key=os.getenv("OPENAI_API_KEY"))
+
+    if LLM_PROVIDER == "gemini":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(model=model, temperature=0, google_api_key=os.getenv("GOOGLE_API_KEY"))
+
+    if LLM_PROVIDER == "groq":
+        from langchain_groq import ChatGroq
+        return ChatGroq(model=model, temperature=0, groq_api_key=os.getenv("GROQ_API_KEY"))
+
+    raise ValueError(f"Unknown LLM_PROVIDER '{LLM_PROVIDER}'. Use one of: {', '.join(_DEFAULT_MODELS)}")
 
 
 # ─────────────────────────────────────────
@@ -140,14 +179,12 @@ def get_sensor_helper() -> SensorHelper:
 
 @st.cache_resource
 def get_classification_chain() -> LLMChain:
-    llm = ChatOpenAI(openai_api_key=os.getenv("OPENAI_API_KEY"), temperature=0)
-    return LLMChain(llm=llm, prompt=classification_prompt)
+    return LLMChain(llm=_build_llm(), prompt=classification_prompt)
 
 
 @st.cache_resource
 def get_fallback_chain() -> LLMChain:
-    llm = ChatOpenAI(openai_api_key=os.getenv("OPENAI_API_KEY"), temperature=0)
-    return LLMChain(llm=llm, prompt=fallback_prompt)
+    return LLMChain(llm=_build_llm(), prompt=fallback_prompt)
 
 
 # ─────────────────────────────────────────
