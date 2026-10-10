@@ -24,6 +24,17 @@ class FakeChain:
         return self.responses.pop(0)
 
 
+def chain_resp(cypher, result):
+    """Builds a response dict shaped like the REAL GraphCypherQAChain's
+    output with return_intermediate_steps=True: there is no top-level
+    "cypher" key — the generated Cypher only ever appears inside
+    intermediate_steps[0]["query"]. (A response shaped with a top-level
+    "cypher" key, as earlier versions of these tests used, doesn't match
+    reality and let a real bug slip past: ask_graph was reading a key the
+    chain never populates.)"""
+    return {"intermediate_steps": [{"query": cypher}], "result": result}
+
+
 class FakeGraph:
     """Stands in for Neo4jGraph. `rows_by_cypher` maps a Cypher string to
     the rows .query() should return (or raises if mapped to an Exception)."""
@@ -41,7 +52,7 @@ class FakeGraph:
 
 
 def test_success_on_first_attempt_with_direct_result():
-    chain = FakeChain([{"cypher": "MATCH (r:Room) RETURN r", "result": "room 101"}])
+    chain = FakeChain([chain_resp("MATCH (r:Room) RETURN r", "room 101")])
     graph = FakeGraph()
 
     cypher, result, error = ask_graph("any question", chain, graph)
@@ -53,7 +64,7 @@ def test_success_on_first_attempt_with_direct_result():
 
 def test_success_via_direct_execution_when_chain_gives_no_result_text():
     cypher_text = "MATCH (r:Room) RETURN r.room_number"
-    chain = FakeChain([{"cypher": cypher_text, "result": None}])
+    chain = FakeChain([chain_resp(cypher_text, None)])
     graph = FakeGraph(rows_by_cypher={cypher_text: [{"room_number": "101"}]})
 
     cypher, result, error = ask_graph("any question", chain, graph)
@@ -66,8 +77,8 @@ def test_success_via_direct_execution_when_chain_gives_no_result_text():
 def test_apology_triggers_retry_and_second_attempt_succeeds():
     good_cypher = "MATCH (r:Room) RETURN r.room_number"
     chain = FakeChain([
-        {"cypher": "", "result": "I'm sorry, I cannot answer that."},
-        {"cypher": good_cypher, "result": None},
+        chain_resp("", "I'm sorry, I cannot answer that."),
+        chain_resp(good_cypher, None),
     ])
     graph = FakeGraph(rows_by_cypher={good_cypher: [{"room_number": "102"}]})
 
@@ -84,8 +95,8 @@ def test_execution_error_triggers_retry_with_error_fed_back():
     bad_cypher = "MATCH (r:Room)-[:WRONG]->(s) RETURN r"
     good_cypher = "MATCH (r:Room) RETURN r.room_number"
     chain = FakeChain([
-        {"cypher": bad_cypher, "result": None},
-        {"cypher": good_cypher, "result": None},
+        chain_resp(bad_cypher, None),
+        chain_resp(good_cypher, None),
     ])
     graph = FakeGraph(rows_by_cypher={
         bad_cypher: Exception("Unknown relationship type: WRONG"),
@@ -103,8 +114,8 @@ def test_execution_error_triggers_retry_with_error_fed_back():
 def test_zero_rows_on_both_attempts_returns_real_error_not_silent_failure():
     empty_cypher = "MATCH (r:Room {room_number:'999'}) RETURN r"
     chain = FakeChain([
-        {"cypher": empty_cypher, "result": None},
-        {"cypher": empty_cypher, "result": None},
+        chain_resp(empty_cypher, None),
+        chain_resp(empty_cypher, None),
     ])
     graph = FakeGraph(rows_by_cypher={empty_cypher: []})
 
@@ -117,8 +128,8 @@ def test_zero_rows_on_both_attempts_returns_real_error_not_silent_failure():
 
 def test_no_cypher_and_no_result_returns_error_without_crashing():
     chain = FakeChain([
-        {"cypher": None, "result": None},
-        {"cypher": None, "result": None},
+        chain_resp(None, None),
+        chain_resp(None, None),
     ])
     graph = FakeGraph()
 
@@ -130,7 +141,7 @@ def test_no_cypher_and_no_result_returns_error_without_crashing():
 
 
 def test_max_retries_zero_disables_retry():
-    chain = FakeChain([{"cypher": "", "result": "I'm sorry, I cannot answer that."}])
+    chain = FakeChain([chain_resp("", "I'm sorry, I cannot answer that.")])
     graph = FakeGraph()
 
     cypher, result, error = ask_graph("question", chain, graph, max_retries=0)
@@ -142,8 +153,8 @@ def test_max_retries_zero_disables_retry():
 def test_on_attempt_fires_once_per_attempt_with_error_or_none():
     good_cypher = "MATCH (r:Room) RETURN r.room_number"
     chain = FakeChain([
-        {"cypher": "", "result": "I'm sorry, I cannot answer that."},
-        {"cypher": good_cypher, "result": None},
+        chain_resp("", "I'm sorry, I cannot answer that."),
+        chain_resp(good_cypher, None),
     ])
     graph = FakeGraph(rows_by_cypher={good_cypher: [{"room_number": "104"}]})
     seen = []

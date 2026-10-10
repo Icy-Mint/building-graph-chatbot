@@ -31,7 +31,7 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
 
 _DEFAULT_MODELS = {
     "openai": "gpt-4",
-    "gemini": "gemini-2.0-flash",
+    "gemini": "gemini-3.8-flash",
     "groq": "llama-3.3-70b-versatile",
 }
 _PROVIDER_API_KEY_ENV = {
@@ -211,6 +211,10 @@ def get_chain() -> GraphCypherQAChain:
         execute_on_graph=True,   # execution
         allow_dangerous_requests=True,  # allow the direct access to the database
         validate_cypher=True,    # catch hallucinated relationship directions before executing
+        return_intermediate_steps=True,  # the chain never populates a "cypher"
+        # key in its result dict — the generated Cypher only appears in
+        # intermediate_steps[0]["query"], and only if this is True. Without
+        # it, resp.get("cypher") below is always None.
         verbose=True,
     )
 
@@ -222,6 +226,13 @@ def get_chain() -> GraphCypherQAChain:
 # ─────────────────────────────────────────
 def _looks_like_apology(text) -> bool:
     return isinstance(text, str) and text.lower().startswith(("i'm sorry", "cannot answer"))
+
+
+def _extract_generated_cypher(resp: dict) -> str:
+    for step in resp.get("intermediate_steps") or []:
+        if "query" in step:
+            return step["query"]
+    return ""
 
 
 def ask_graph(
@@ -248,7 +259,7 @@ def ask_graph(
         except Exception as e:
             resp, error = {}, str(e)
 
-        cypher_raw = resp.get("cypher")
+        cypher_raw = _extract_generated_cypher(resp)
         cypher = cypher_raw.strip() if cypher_raw else ""
         cypher = re.sub(r"'\s*([\w-]+)\s*'", r"'\1'", cypher)
 
