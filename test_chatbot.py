@@ -33,18 +33,24 @@ class FakeGraphHelper:
 
 
 def make_sensor_helper():
-    """A SensorHelper with in-memory tables instead of reading CSVs."""
+    """A SensorHelper with in-memory tables instead of reading CSVs.
+
+    Each room's all-time peak/low deliberately differs from its latest
+    ("current") reading, so tests can tell apart the current_* actions
+    (latest row) from the alltime_* actions (historical max/min) -- the
+    exact distinction a past bug collapsed into one meaning.
+    """
     sh = SensorHelper.__new__(SensorHelper)  # bypass __init__'s disk read
     sh.tables = {
         "101": pd.DataFrame({
-            "timestamp": pd.to_datetime(["2024-01-01 00:00", "2024-01-01 06:00"]),
-            "temperature": [20.0, 25.0],
-            "occupancy": [0, 1],
+            "timestamp": pd.to_datetime(["2024-01-01 00:00", "2024-01-01 03:00", "2024-01-01 06:00"]),
+            "temperature": [20.0, 30.0, 25.0],  # all-time peak 30.0 @ 03:00, latest 25.0 @ 06:00
+            "occupancy": [0, 1, 0],  # latest (06:00) is vacant
         }),
         "102": pd.DataFrame({
-            "timestamp": pd.to_datetime(["2024-01-01 00:00", "2024-01-01 06:00"]),
-            "temperature": [18.0, 19.0],
-            "occupancy": [1, 1],
+            "timestamp": pd.to_datetime(["2024-01-01 00:00", "2024-01-01 03:00", "2024-01-01 06:00"]),
+            "temperature": [18.0, 19.0, 17.0],  # all-time peak 19.0 @ 03:00, latest 17.0 @ 06:00
+            "occupancy": [1, 1, 1],  # latest (06:00) is occupied
         }),
     }
     return sh
@@ -56,16 +62,17 @@ def classify(action, room):
     return f'```json\n{{"action": "{action}", "room": {room_json}}}\n```'
 
 
-def test_hottest_with_known_room_returns_that_room_only():
-    chain = FakeChain([classify("hottest", "101")])
+def test_alltime_hottest_with_known_room_returns_that_room_only():
+    chain = FakeChain([classify("alltime_hottest", "101")])
     sensor_helper = make_sensor_helper()
 
     answer, action, room = ask(
-        "hottest room 101?", chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+        "what's the highest temperature room 101 has ever recorded?",
+        chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
     )
 
     assert "Room 101" in answer and "102" not in answer
-    assert action == "hottest"
+    assert action == "alltime_hottest"
     assert room == "101"
 
 
@@ -74,11 +81,11 @@ def test_room_returned_as_int_is_normalized_to_string():
     quoted string). sh.tables is keyed by strings, so without normalizing,
     `room in sensor_helper.tables` would silently miss and fall through to
     "all rooms" instead of answering about the specific room asked."""
-    chain = FakeChain([classify("hottest", 101)])
+    chain = FakeChain([classify("alltime_hottest", 101)])
     sensor_helper = make_sensor_helper()
 
     answer, action, room = ask(
-        "hottest room 101?", chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+        "highest ever in room 101?", chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
     )
 
     assert room == "101"
@@ -86,15 +93,102 @@ def test_room_returned_as_int_is_normalized_to_string():
 
 
 def test_no_room_returns_all_rooms():
-    chain = FakeChain([classify("coldest", None)])
+    chain = FakeChain([classify("alltime_coldest", None)])
     sensor_helper = make_sensor_helper()
 
     answer, action, room = ask(
-        "which room is coldest?", chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+        "what's the lowest temperature ever recorded in any room?",
+        chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
     )
 
     assert "Room 101" in answer and "Room 102" in answer
     assert room is None
+
+
+# ───────────────────────────────────────────────────────────────────────
+# current_* actions vs alltime_* actions: the fixture's rooms have an
+# all-time peak that differs from their latest reading specifically so
+# these can't pass by accident.
+# ───────────────────────────────────────────────────────────────────────
+
+def test_current_temp_reports_latest_reading_not_alltime_peak():
+    chain = FakeChain([classify("current_temp", "101")])
+    sensor_helper = make_sensor_helper()
+
+    answer, action, room = ask(
+        "what's the current temperature in room 101?",
+        chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+    )
+
+    assert "25.0" in answer  # latest reading, not the 30.0 all-time peak
+    assert "30.0" not in answer
+    assert action == "current_temp"
+
+
+def test_alltime_hottest_reports_historical_peak_not_latest():
+    chain = FakeChain([classify("alltime_hottest", "101")])
+    sensor_helper = make_sensor_helper()
+
+    answer, action, room = ask(
+        "what's the highest temperature room 101 has ever hit?",
+        chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+    )
+
+    assert "30.0" in answer  # the all-time peak, not the 25.0 latest reading
+
+
+def test_current_hottest_compares_latest_readings_across_rooms():
+    # latest readings: 101 -> 25.0, 102 -> 17.0; 101 should win despite 102
+    # having a higher all-time peak (19.0) than 101's latest (25.0 > 19.0 anyway,
+    # but this also confirms it's not accidentally using all-time 101-peak 30.0)
+    chain = FakeChain([classify("current_hottest", None)])
+    sensor_helper = make_sensor_helper()
+
+    answer, action, room = ask(
+        "which room is hottest right now?", chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+    )
+
+    assert "Room 101" in answer
+    assert "25.0" in answer
+    assert action == "current_hottest"
+
+
+def test_current_coldest_compares_latest_readings_across_rooms():
+    # latest readings: 101 -> 25.0, 102 -> 17.0; 102 is colder right now
+    chain = FakeChain([classify("current_coldest", None)])
+    sensor_helper = make_sensor_helper()
+
+    answer, action, room = ask(
+        "which room is coldest right now?", chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+    )
+
+    assert "Room 102" in answer
+    assert "17.0" in answer
+
+
+def test_current_occupancy_reports_latest_status():
+    chain = FakeChain([classify("current_occupancy", "101")])
+    sensor_helper = make_sensor_helper()
+
+    answer, action, room = ask(
+        "is room 101 occupied right now?", chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+    )
+
+    assert "vacant" in answer.lower()  # latest reading for 101 is occupancy=0
+    assert action == "current_occupancy"
+
+
+def test_occupancy_pattern_still_reports_historical_hours():
+    chain = FakeChain([classify("occupancy_pattern", "102")])
+    sensor_helper = make_sensor_helper()
+
+    answer, action, room = ask(
+        "when is room 102 typically occupied?",
+        chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+    )
+
+    assert "occupied during" in answer
+    assert action == "occupancy_pattern"
 
 
 def test_ac_mapping_formats_rows():

@@ -120,12 +120,57 @@ class SensorHelper:
         return (f"Room {room} reached lowest temperature {low.temperature:.1f} °C "
                 f"on {low.timestamp.strftime('%Y-%m-%d %H:%M')}")
 
+    def _latest_row(self, room):
+        df = self.tables.get(room)
+        if df is None:
+            return None
+        return df.loc[df.timestamp.idxmax()]
+
+    def current_temp(self, room):
+        latest = self._latest_row(room)
+        if latest is None:
+            return f"No temperature data for room {room}"
+        return (f"The current temperature in room {room} is {latest.temperature:.1f} °C "
+                f"as of {latest.timestamp.strftime('%Y-%m-%d %H:%M')}.")
+
+    def current_occupancy(self, room):
+        latest = self._latest_row(room)
+        if latest is None:
+            return f"No occupancy data for room {room}"
+        status = "occupied" if latest.occupancy == 1 else "vacant"
+        return f"Room {room} is currently {status} (as of {latest.timestamp.strftime('%Y-%m-%d %H:%M')})."
+
+    def current_hottest_room(self):
+        if not self.tables:
+            return "No temperature data available."
+        best_room, best = None, None
+        for room in self.tables:
+            latest = self._latest_row(room)
+            if best is None or latest.temperature > best.temperature:
+                best_room, best = room, latest
+        return (f"Room {best_room} is currently the hottest at {best.temperature:.1f} °C "
+                f"(as of {best.timestamp.strftime('%Y-%m-%d %H:%M')}).")
+
+    def current_coldest_room(self):
+        if not self.tables:
+            return "No temperature data available."
+        best_room, best = None, None
+        for room in self.tables:
+            latest = self._latest_row(room)
+            if best is None or latest.temperature < best.temperature:
+                best_room, best = room, latest
+        return (f"Room {best_room} is currently the coldest at {best.temperature:.1f} °C "
+                f"(as of {best.timestamp.strftime('%Y-%m-%d %H:%M')}).")
+
 
 # ─────────────────────────────────────────
 # PROMPTS (pure strings/objects, no side effects — safe to import)
 # ─────────────────────────────────────────
 response_schemas = [
-    ResponseSchema(name="action", description="One of: hottest, coldest, occupancy, ac_mapping, fallback"),
+    ResponseSchema(name="action", description=(
+        "One of: current_hottest, current_coldest, current_temp, alltime_hottest, "
+        "alltime_coldest, current_occupancy, occupancy_pattern, ac_mapping, fallback"
+    )),
     ResponseSchema(name="room", description="Room number if mentioned, else null")
 ]
 parser = StructuredOutputParser.from_response_schemas(response_schemas)
@@ -133,10 +178,18 @@ parser = StructuredOutputParser.from_response_schemas(response_schemas)
 classification_prompt = PromptTemplate(
     template="""
 You are a smart assistant for building management.
-Classify the user question into one of the following actions:
-- hottest: user asks about highest, hottest, max temperature
-- coldest: user asks about lowest, coldest, coolest, min temperature
-- occupancy: user asks about room usage or occupancy patterns
+Classify the user question into one of the following actions. Default to the
+current_* actions unless the user explicitly says "ever", "historically",
+"all-time", or "record" — "hottest"/"coldest" with no such qualifier means
+"right now", not an all-time extreme.
+
+- current_hottest: which room is hottest right now (no specific room, present tense)
+- current_coldest: which room is coldest right now
+- current_temp: the current/right-now temperature in a SPECIFIC room
+- alltime_hottest: the highest temperature EVER recorded (explicitly historical)
+- alltime_coldest: the lowest temperature ever recorded (explicitly historical)
+- current_occupancy: whether a SPECIFIC room is occupied right now (yes/no status)
+- occupancy_pattern: when a room is typically/usually occupied (a pattern across hours, not current status)
 - ac_mapping: user asks which AC unit services which rooms
 - fallback: all other questions
 
@@ -224,19 +277,37 @@ def ask(query, classification_chain, fallback_chain, parser, graph_helper, senso
     # check below and fall through to "all rooms" instead of erroring.
 
     try:
-        if action == "hottest":
+        if action == "current_hottest":
+            answer = sensor_helper.current_hottest_room()
+
+        elif action == "current_coldest":
+            answer = sensor_helper.current_coldest_room()
+
+        elif action == "current_temp":
+            if room and room in sensor_helper.tables:
+                answer = sensor_helper.current_temp(room)
+            else:
+                answer = "\n".join(sensor_helper.current_temp(r) for r in sensor_helper.tables)
+
+        elif action == "alltime_hottest":
             if room and room in sensor_helper.tables:
                 answer = sensor_helper.hottest(room)
             else:
                 answer = "\n".join(sensor_helper.hottest(r) for r in sensor_helper.tables)
 
-        elif action == "coldest":
+        elif action == "alltime_coldest":
             if room and room in sensor_helper.tables:
                 answer = sensor_helper.coldest(room)
             else:
                 answer = "\n".join(sensor_helper.coldest(r) for r in sensor_helper.tables)
 
-        elif action == "occupancy":
+        elif action == "current_occupancy":
+            if room and room in sensor_helper.tables:
+                answer = sensor_helper.current_occupancy(room)
+            else:
+                answer = "\n".join(sensor_helper.current_occupancy(r) for r in sensor_helper.tables)
+
+        elif action == "occupancy_pattern":
             if room and room in sensor_helper.tables:
                 answer = sensor_helper.occupancy_pattern(room)
             else:
