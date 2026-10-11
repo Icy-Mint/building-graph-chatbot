@@ -10,11 +10,19 @@ This is a separate subproject from the Streamlit bots one level up
 Docker Compose, Claude tool-use agent vs. single-file Streamlit apps),
 different dependencies, its own venv.
 
-## Status: Step 3 of 6
+## Status: Step 4 of 6 (agent loop — code complete, NOT verified live)
 
-The Neo4j graph model, the TimescaleDB time-series generator, and the tool
-layer (7 typed functions over both DBs) are built. Steps 4–6 (agent loop,
-API/UI, eval harness) are not started.
+The Neo4j graph model, the TimescaleDB time-series generator, the tool
+layer, and the agent loop are built. **No `ANTHROPIC_API_KEY` has been
+available at any point during this project**, so unlike every other step,
+Step 4 has only been tested with a fake Anthropic client (see
+`tests/test_agent_loop.py`) — its control flow (tool_use handling, retry
+within budget, iteration cap, never overriding a decline) is verified, but
+it has never actually talked to the real API. The request shape (model ID,
+`cache_control` placement, `system`/`tools` structure) is believed correct
+based on the installed SDK's own type definitions, not confirmed by a live
+call. Run it against the real API before trusting it. Steps 5–6 (FastAPI/
+Streamlit UI, eval harness) are not started.
 
 ## Graph model
 
@@ -124,10 +132,52 @@ connects as that role, never the admin one. Verified live: `SELECT` works,
 `INSERT` fails with a genuine Postgres `InsufficientPrivilege` error — this
 one actually is DB-enforced, not just application-level.
 
-## Running Steps 1–3
+## Agent loop (Step 4)
+
+`app/agent/loop.py`: a hand-rolled loop over the Anthropic tool-use API —
+no agent framework. `ask(question)` sends the question plus the 7 tool
+definitions (`app/agent/tool_specs.py`) and the system prompt
+(`app/agent/prompts.py`); on a `tool_use` response it dispatches to the
+real typed tool, feeds the structured result straight back (errors
+included, marked `is_error`), and lets the model decide whether to retry
+with corrected arguments, call another tool, or answer — the "retry once on
+error" from the spec isn't special-cased, it falls out naturally from
+feeding the error back and bounding total iterations.
+
+- **Iteration cap**: `MAX_AGENT_ITERATIONS` (default 5, env-overridable).
+  On hitting it, one final call without `tools` asks for the best partial
+  answer and to say plainly the investigation was incomplete — verified via
+  a fake client that always returns `tool_use` (an agent that never
+  converges): the loop stops exactly at the cap, makes that one wrap-up
+  call, and reports `hit_iteration_cap: True`.
+- **Never overrides a decline**: if the model's first response is plain
+  text (e.g. "I don't have enough information"), that's returned as-is —
+  verified directly.
+- **Model**: `ANTHROPIC_MODEL` env var, default `claude-sonnet-5`.
+  `get_model()` is a single, clearly-marked seam for a future cheap/capable
+  router — not built.
+- **Prompt caching**: `cache_control: ephemeral` on the system prompt and
+  the last tool definition (which, per Anthropic's caching rules, caches
+  the whole stable tools list too, since a cache marker covers everything
+  up to and including that block). `log_turn()` records
+  `cache_read_input_tokens`/`cache_creation_input_tokens` per turn so
+  caching effectiveness is visible in the log, not assumed.
+- **Logging**: `logs/agent_turns.jsonl` — one line per `ask()` call:
+  question, every tool call (name/args/status/latency), token usage
+  (including cache fields), the final answer, and total latency.
+- **Prompt-injection guidance**: the system prompt explicitly tells the
+  model to treat tool results as data, never as instructions — relevant to
+  the eval harness's planned injection test case (Step 6).
+
+**Verified**: the loop's control flow, with a fake Anthropic client (7
+tests) — tool dispatch, error feedback, retry-within-budget, the iteration
+cap, and usage accumulation. **Not verified**: an actual call to the real
+Anthropic API (see the status note at the top of this file).
+
+## Running Steps 1–4
 
 ```bash
-cp .env.example .env   # fill in all *_PASSWORD vars
+cp .env.example .env   # fill in all *_PASSWORD vars, and ANTHROPIC_API_KEY to actually run the agent
 docker compose up -d   # neo4j + timescaledb
 
 python -m venv .venv && source .venv/Scripts/activate  # or .venv/bin/activate on macOS/Linux
@@ -140,11 +190,13 @@ python -m app.timeseries.schema
 python -m app.timeseries.generate --seed 42 --days 14
 python -m app.timeseries.readonly_role   # creates the read-only Postgres role
 
-pytest   # 45 tests: offline model/safety checks + live tool-layer tests against the containers above
+pytest   # 60 tests: offline model/safety/agent-loop checks + live tool-layer tests against the containers above
+
+# requires ANTHROPIC_API_KEY in .env -- not yet verified to work:
+python -c "from app.agent.loop import ask; print(ask('Which rooms does AC-1 service?'))"
 ```
 
 ## Roadmap (not yet built)
 
-4. Agent loop (Anthropic tool use, logging)
 5. FastAPI + Streamlit UI
 6. Eval harness (25+ golden cases, deterministic scoring, drift guard)
