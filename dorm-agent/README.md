@@ -10,10 +10,11 @@ This is a separate subproject from the Streamlit bots one level up
 Docker Compose, Claude tool-use agent vs. single-file Streamlit apps),
 different dependencies, its own venv.
 
-## Status: Step 2 of 6
+## Status: Step 3 of 6
 
-The Neo4j graph model and the TimescaleDB time-series generator are built.
-Steps 3–6 (tool layer, agent loop, API/UI, eval harness) are not started.
+The Neo4j graph model, the TimescaleDB time-series generator, and the tool
+layer (7 typed functions over both DBs) are built. Steps 4–6 (agent loop,
+API/UI, eval harness) are not started.
 
 ## Graph model
 
@@ -27,7 +28,7 @@ Steps 3–6 (tool layer, agent loop, API/UI, eval harness) are not started.
 
 8 rooms (101–106 dorm, 201–202 mechanical), 2 AC units, each dorm room has
 one temperature and one occupancy sensor. Mechanical rooms intentionally
-have no sensors — the tool layer (Step 3) needs to return a distinguishable
+have no sensors — the tool layer (Step 3, below) returns a distinguishable
 `no_sensors` status for that case, not an empty result.
 
 `app/model.py` holds the room/AC assignments (and, as of Step 2, the
@@ -56,22 +57,6 @@ probability table, not a hard on/off window — two profiles
 weekend hour-of-day patterns, so there's real day-of-week signal for
 `forecast_occupancy` (Step 3) to recover from history later.
 
-## Running Steps 1–2
-
-```bash
-cp .env.example .env   # fill in NEO4J_PASSWORD and POSTGRES_PASSWORD at minimum
-docker compose up -d   # both neo4j and timescaledb
-python -m venv .venv && source .venv/Scripts/activate  # or .venv/bin/activate on macOS/Linux
-pip install -r requirements.txt
-
-python -m app.graph.seed          # idempotent -- safe to re-run
-python -m app.graph.validate      # exits non-zero if any invariant fails
-
-python -m app.timeseries.schema   # creates the hypertable + continuous aggregate
-python -m app.timeseries.generate --seed 42 --days 14   # clears + regenerates every run
-python -m app.timeseries.plot     # sanity_check.png: TEMP_101 + OCC_102 over 3 days
-```
-
 `validate.py` checks: exactly 8 rooms (6 dorm / 2 mechanical), exactly 2 AC
 units each servicing exactly 3 dorm rooms, every dorm has exactly one
 temperature + one occupancy sensor, every mechanical room has none, and
@@ -87,23 +72,79 @@ profile bases, as expected over a full sinusoidal period), full-time-student
 rooms averaged ~65% occupancy vs. ~58% for night-shift rooms, and the
 continuous aggregate populated exactly 2016 rows (14 days × 24h × 6 rooms).
 
-## Note: read-only access (relevant from Step 3 onward)
+## Tool layer (Step 3)
 
-The spec requires a read-only DB role for the tool layer. `docker-compose.yml`
-currently runs Neo4j **Community edition**, which has no per-role access
-control at all (any authenticated user has full read/write access) — that's
-an Enterprise-only feature. When Step 3 gets there, the options are: switch
-the compose file to `neo4j:5-enterprise` (free for local/dev under Neo4j's
-evaluation license, via `NEO4J_ACCEPT_LICENSE_AGREEMENT=yes`) for a real DB
-role, or enforce read-only at the application layer (wrap the driver so any
-non-`MATCH`/`RETURN` query is rejected before it executes, the same approach
-used in the sibling `chatbotForecast.py` project after its Aura Free tier
-turned out not to support custom roles either). Not deciding this now since
-it isn't needed until Step 3 — flagging it here so it isn't a surprise.
+`app/tools/`: 7 typed functions, each running exactly one hand-written,
+parameterized query. The LLM (Step 4) picks which to call and what
+arguments to pass — it never writes Cypher or SQL itself.
+
+**Graph** (`graph_tools.py`): `get_rooms_serviced_by_ac`, `get_ac_for_room`,
+`get_room_info`.
+**Time-series** (`timeseries_tools.py`): `get_temp_readings`,
+`get_hot_periods`, `get_occupancy`, `forecast_occupancy` — all pre-aggregate
+inside the tool and cap row counts (`MAX_ROW_CAP = 2000`; verified live that
+a 14-day raw query across all 6 rooms, 24,192 rows, is correctly rejected
+rather than silently truncated or dumped on the model).
+
+Every tool returns `{"status": "ok" | "no_data" | "no_sensors" | "error",
+...}` via shared validators in `app/tools/errors.py`. The dorm/mechanical
+distinction is deliberate: `validate_room_has_sensors` (used by the
+time-series tools) returns `no_sensors` for a mechanical room, distinct from
+`error` for an unknown one — but `validate_known_room` (used by
+`get_room_info`, where a mechanical room is a complete, valid answer) treats
+both as equally valid rooms. Multi-room calls (`get_temp_readings`,
+`get_occupancy`) validate each room independently and still answer for the
+valid ones if only some are bad, rather than failing the whole call — more
+useful for an agent that can read the per-room errors and retry just the
+bad argument.
+
+`forecast_occupancy` is a deterministic statistical forecast (mean
+occupancy by day-of-week + hour-of-day from history, looked up per hour of
+the requested horizon) — no model/randomness involved, so the agent reports
+numbers, it never generates them. Verified it recovers the generator's
+built-in signal: room 101 (`full_time_student`) and the other profile's
+rooms both forecast plausible, history-grounded probabilities, not noise.
+
+### Read-only access — resolved
+
+As flagged after Step 2: Neo4j Community edition (what `docker-compose.yml`
+runs) has no per-role access control, so `app/graph/client.py` enforces
+read-only at the application layer instead (`run_read_only()` rejects any
+`CREATE`/`MERGE`/`DELETE`/`SET`/`REMOVE`/`DROP` before it reaches the
+driver — verified live with an actual `DETACH DELETE` attempt). This is
+lower-risk here than the same pattern was for `chatbotForecast.py`: every
+query the tool layer runs is hand-written and fixed, never LLM-generated,
+so this is defense in depth, not the primary safeguard.
+
+**Postgres is different** — a real read-only role costs nothing there, no
+edition tier involved. `python -m app.timeseries.readonly_role` creates a
+`dorm_readonly` Postgres role with `SELECT`-only grants (including on future
+tables, via `ALTER DEFAULT PRIVILEGES`); `app/tools/timeseries_tools.py`
+connects as that role, never the admin one. Verified live: `SELECT` works,
+`INSERT` fails with a genuine Postgres `InsufficientPrivilege` error — this
+one actually is DB-enforced, not just application-level.
+
+## Running Steps 1–3
+
+```bash
+cp .env.example .env   # fill in all *_PASSWORD vars
+docker compose up -d   # neo4j + timescaledb
+
+python -m venv .venv && source .venv/Scripts/activate  # or .venv/bin/activate on macOS/Linux
+pip install -r requirements.txt
+
+python -m app.graph.seed
+python -m app.graph.validate
+
+python -m app.timeseries.schema
+python -m app.timeseries.generate --seed 42 --days 14
+python -m app.timeseries.readonly_role   # creates the read-only Postgres role
+
+pytest   # 45 tests: offline model/safety checks + live tool-layer tests against the containers above
+```
 
 ## Roadmap (not yet built)
 
-3. Tool layer (typed functions, unit-tested, no LLM)
 4. Agent loop (Anthropic tool use, logging)
 5. FastAPI + Streamlit UI
 6. Eval harness (25+ golden cases, deterministic scoring, drift guard)
