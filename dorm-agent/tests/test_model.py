@@ -1,7 +1,7 @@
 """Offline sanity checks on the static graph model data (no Docker/Neo4j
 needed) -- catches data-entry errors like a room assigned to two AC units
 or left out entirely, before they ever reach seed.py."""
-from app.graph.model import (
+from app.model import (
     AC_ASSIGNMENTS,
     DORM_ROOMS,
     MECHANICAL_ROOMS,

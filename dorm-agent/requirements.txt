@@ -1,5 +1,11 @@
-# Step 1 deps only. FastAPI/psycopg/anthropic/streamlit get added in the
-# steps that actually need them, not up front.
+# Step 1
 neo4j>=5.0,<6.0
 python-dotenv
 pytest
+
+# Step 2
+psycopg[binary]>=3.1,<4.0
+numpy
+matplotlib
+
+# FastAPI/anthropic/streamlit get added in the steps that actually need them.

@@ -7,7 +7,7 @@ Run:
 import sys
 
 from app.graph.client import get_driver
-from app.graph.model import AC_ASSIGNMENTS, DORM_ROOMS, MECHANICAL_ROOMS
+from app.model import AC_ASSIGNMENTS, DORM_ROOMS, MECHANICAL_ROOMS
 
 _failures = []
 

@@ -7,7 +7,7 @@ Run:
     python -m app.graph.seed
 """
 from app.graph.client import get_driver
-from app.graph.model import (
+from app.model import (
     AC_ASSIGNMENTS,
     BUILDING_NAME,
     DORM_ROOMS,
