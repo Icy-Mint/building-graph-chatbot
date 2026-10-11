@@ -1,0 +1,5 @@
+# Step 1 deps only. FastAPI/psycopg/anthropic/streamlit get added in the
+# steps that actually need them, not up front.
+neo4j>=5.0,<6.0
+python-dotenv
+pytest
