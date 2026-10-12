@@ -18,20 +18,20 @@ from app.tools.errors import (
 
 
 @pytest.mark.parametrize("cypher", [
-    "MATCH (r:Room) RETURN r.number",
-    "MATCH (a:ACUnit {label: 'AC-1'})-[:SERVICES]->(r:Room) RETURN r.number",
-    "MATCH (r:Room)-[:HAS_SENSOR]->(s:Sensor) RETURN s.label ORDER BY s.label LIMIT 10",
+    "MATCH (r:Room) RETURN r.room_number",
+    "MATCH (a:AC_Unit {ac_id: 'AC1'})-[:SERVICES]->(r:Room) RETURN r.room_number",
+    "MATCH (r:Room)-[:HAS_SENSOR]->(s:Sensor) RETURN s.sensor_id ORDER BY s.sensor_id LIMIT 10",
 ])
 def test_ensure_read_only_cypher_allows_real_tool_queries(cypher):
     ensure_read_only_cypher(cypher)  # should not raise
 
 
 @pytest.mark.parametrize("cypher", [
-    "MATCH (r:Room {number: '999'}) DETACH DELETE r",
+    "MATCH (r:Room {room_number: '999'}) DETACH DELETE r",
     "MATCH (r:Room) DELETE r",
-    "CREATE (r:Room {number: '999'})",
-    "MATCH (r:Room {number: '101'}) SET r.type = 'mechanical'",
-    "MERGE (r:Room {number: '999'})",
+    "CREATE (r:Room {room_number: '999'})",
+    "MATCH (r:Room {room_number: '101'}) SET r.type = 'mechanical'",
+    "MERGE (r:Room {room_number: '999'})",
     "DROP CONSTRAINT room_number_unique",
 ])
 def test_ensure_read_only_cypher_blocks_write_clauses(cypher):

@@ -1,14 +1,24 @@
-"""Shared constants describing the dorm building graph model. Both seed.py
-and validate.py import from here so the two can't silently drift apart.
+"""Shared constants describing the dorm building graph model. seed.py,
+validate.py, and the tool layer all import from here so none of them can
+silently drift apart.
 
-Graph shape:
-    (:Building)-[:HAS_ROOM]->(:Room {number, type})
-    (:ACUnit {label})-[:LOCATED_IN]->(:Room {type: "mechanical"})
-    (:ACUnit)-[:SERVICES]->(:Room {type: "dorm"})          exactly 3 dorms per AC
-    (:Room)-[:HAS_SENSOR]->(:Sensor {label, type})         type: temperature | occupancy
-    (:Sensor {type: "temperature"})-[:MONITORS_FOR]->(:ACUnit)
+Graph shape (standardized to match chatbot.py/chatbotForecast.py's existing
+Aura schema, so the local Neo4j this project seeds can be used as a drop-in
+alternative to Aura for those two files -- no code changes on their side,
+just a connection string):
+    (:Building)-[:HAS_ROOM]->(:Room {room_number, type})
+    (:Room {type: "mechanical"})-[:CONTAINS]->(:AC_Unit {ac_id})
+    (:AC_Unit)-[:SERVICES]->(:Room {type: "dorm"})              exactly 3 dorms per AC
+    (:Room)-[:HAS_SENSOR]->(:Sensor {sensor_id, sensor_type})   sensor_type: temperature | occupancy
+    (:Sensor {sensor_type: "temperature"})-[:REPORTS_TO]->(:AC_Unit)
+    (:Sensor)-[:RECORDED]->(:Reading {timestamp, value, sensor_type, room_number})
 
-Mechanical rooms intentionally have no sensors.
+Mechanical rooms intentionally have no sensors. Reading nodes are a
+duplicate of TimescaleDB's sensor_readings table (see
+app/graph/load_readings.py) -- they exist only so chatbotForecast.py's
+existing NL-to-Cypher design, which expects sensor data to live in Neo4j,
+keeps working unmodified against this database. TimescaleDB remains the
+source of truth; Reading nodes are loaded from it, never the reverse.
 """
 
 BUILDING_NAME = "Dorm Hall A"
@@ -18,8 +28,8 @@ MECHANICAL_ROOMS = ["201", "202"]
 
 # Which AC unit is located in which mechanical room and services which dorms.
 AC_ASSIGNMENTS = {
-    "AC-1": {"mechanical_room": "201", "dorms": ["101", "102", "103"]},
-    "AC-2": {"mechanical_room": "202", "dorms": ["104", "105", "106"]},
+    "AC1": {"mechanical_room": "201", "dorms": ["101", "102", "103"]},
+    "AC2": {"mechanical_room": "202", "dorms": ["104", "105", "106"]},
 }
 
 
@@ -34,9 +44,9 @@ def occupancy_sensor_label(room_number: str) -> str:
 # ─────────────────────────────────────────
 # Time-series generation profiles (Step 2)
 # Deliberately assigned to cut ACROSS the AC groupings above, so "which
-# rooms on AC-1 run hot" is an actual question with a non-trivial answer
-# instead of "all of them, because AC-1 happens to equal the sun group."
-# AC-1 = {101,102,103} contributes 2 sun rooms + 1 shaded; AC-2 = {104,105,106}
+# rooms on AC1 run hot" is an actual question with a non-trivial answer
+# instead of "all of them, because AC1 happens to equal the sun group."
+# AC1 = {101,102,103} contributes 2 sun rooms + 1 shaded; AC2 = {104,105,106}
 # contributes 1 sun room + 2 shaded.
 # ─────────────────────────────────────────
 TEMP_PROFILES = {

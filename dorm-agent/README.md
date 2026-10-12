@@ -49,9 +49,9 @@ room) built on top of it.
 **Temperature**: `base + amplitude * sin(2*pi*(hour - peak_shift)/24) +
 gaussian noise`, per room, peaking in the afternoon. Two profiles —
 `sun` (base 23°C, warmer) and `shaded` (base 20°C, cooler) — assigned to
-rooms *across* the AC groupings, not aligned with them: AC-1 (101/102/103)
-ends up with 2 sun rooms + 1 shaded; AC-2 (104/105/106) with 1 sun + 2
-shaded. That's deliberate — it's what makes "do AC-1's rooms run hotter"
+rooms *across* the AC groupings, not aligned with them: AC1 (101/102/103)
+ends up with 2 sun rooms + 1 shaded; AC2 (104/105/106) with 1 sun + 2
+shaded. That's deliberate — it's what makes "do AC1's rooms run hotter"
 a real question instead of a tautology.
 
 **Occupancy**: a Bernoulli draw per 5-minute sample from an hourly
@@ -215,7 +215,7 @@ python -m app.timeseries.readonly_role   # creates the read-only Postgres role
 pytest   # 60 tests: offline model/safety/agent-loop checks + live tool-layer tests against the containers above
 
 # requires ANTHROPIC_API_KEY in .env -- not yet verified to work:
-python -c "from app.agent.loop import ask; print(ask('Which rooms does AC-1 service?'))"
+python -c "from app.agent.loop import ask; print(ask('Which rooms does AC1 service?'))"
 ```
 
 ## Roadmap (not yet built)

@@ -9,7 +9,7 @@ from app.tools.graph_tools import get_ac_for_room, get_room_info, get_rooms_serv
 
 
 def test_get_rooms_serviced_by_ac_specific():
-    result = get_rooms_serviced_by_ac("AC-1")
+    result = get_rooms_serviced_by_ac("AC1")
     assert result["status"] == "ok"
     assert [r["room_number"] for r in result["results"]] == ["101", "102", "103"]
 
@@ -23,12 +23,12 @@ def test_get_rooms_serviced_by_ac_all():
 def test_get_rooms_serviced_by_ac_unknown():
     result = get_rooms_serviced_by_ac("AC-99")
     assert result["status"] == "error"
-    assert result["valid_ac_units"] == ["AC-1", "AC-2"]
+    assert result["valid_ac_units"] == ["AC1", "AC2"]
 
 
 def test_get_ac_for_room_dorm():
     result = get_ac_for_room("104")
-    assert result == {"status": "ok", "room_number": "104", "ac_label": "AC-2"}
+    assert result == {"status": "ok", "room_number": "104", "ac_label": "AC2"}
 
 
 def test_get_ac_for_room_mechanical_is_no_data_not_error():
@@ -48,7 +48,7 @@ def test_get_room_info_dorm_has_both_sensors():
     assert result["status"] == "ok"
     assert result["type"] == "dorm"
     assert sorted(s["type"] for s in result["sensors"]) == ["occupancy", "temperature"]
-    assert result["serviced_by_ac"] == "AC-1"
+    assert result["serviced_by_ac"] == "AC1"
     assert result["houses_ac"] is None
 
 
@@ -61,7 +61,7 @@ def test_get_room_info_mechanical_has_no_sensors_but_still_ok():
     assert result["status"] == "ok"
     assert result["type"] == "mechanical"
     assert result["sensors"] == []
-    assert result["houses_ac"] == "AC-1"
+    assert result["houses_ac"] == "AC1"
 
 
 def test_get_room_info_unknown_room_is_error():

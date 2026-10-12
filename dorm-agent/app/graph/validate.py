@@ -28,7 +28,7 @@ def main():
     driver = get_driver()
     try:
         with driver.session() as session:
-            rooms = q(session, "MATCH (r:Room) RETURN r.number AS number, r.type AS type")
+            rooms = q(session, "MATCH (r:Room) RETURN r.room_number AS room_number, r.type AS type")
             check("exactly 8 Room nodes", len(rooms) == 8, f"found {len(rooms)}")
 
             dorms = [r for r in rooms if r["type"] == "dorm"]
@@ -36,45 +36,45 @@ def main():
             check("exactly 6 dorm rooms", len(dorms) == len(DORM_ROOMS), f"found {len(dorms)}")
             check("exactly 2 mechanical rooms", len(mech) == len(MECHANICAL_ROOMS), f"found {len(mech)}")
 
-            acs = q(session, "MATCH (a:ACUnit) RETURN a.label AS label")
-            check("exactly 2 ACUnit nodes", len(acs) == len(AC_ASSIGNMENTS), f"found {len(acs)}")
+            acs = q(session, "MATCH (a:AC_Unit) RETURN a.ac_id AS ac_id")
+            check("exactly 2 AC_Unit nodes", len(acs) == len(AC_ASSIGNMENTS), f"found {len(acs)}")
 
             for ac in acs:
                 serviced = q(
                     session,
-                    "MATCH (a:ACUnit {label: $label})-[:SERVICES]->(r:Room) "
-                    "RETURN r.number AS number, r.type AS type",
-                    label=ac["label"],
+                    "MATCH (a:AC_Unit {ac_id: $ac_id})-[:SERVICES]->(r:Room) "
+                    "RETURN r.room_number AS room_number, r.type AS type",
+                    ac_id=ac["ac_id"],
                 )
-                check(f"{ac['label']} services exactly 3 rooms", len(serviced) == 3, f"found {len(serviced)}")
+                check(f"{ac['ac_id']} services exactly 3 rooms", len(serviced) == 3, f"found {len(serviced)}")
                 check(
-                    f"{ac['label']} only services dorm rooms",
+                    f"{ac['ac_id']} only services dorm rooms",
                     all(r["type"] == "dorm" for r in serviced),
                     f"types={[r['type'] for r in serviced]}",
                 )
 
-                located = q(
+                contained = q(
                     session,
-                    "MATCH (a:ACUnit {label: $label})-[:LOCATED_IN]->(r:Room) "
-                    "RETURN r.number AS number, r.type AS type",
-                    label=ac["label"],
+                    "MATCH (r:Room)-[:CONTAINS]->(a:AC_Unit {ac_id: $ac_id}) "
+                    "RETURN r.room_number AS room_number, r.type AS type",
+                    ac_id=ac["ac_id"],
                 )
                 check(
-                    f"{ac['label']} located in exactly 1 mechanical room",
-                    len(located) == 1 and located[0]["type"] == "mechanical",
-                    f"found {located}",
+                    f"{ac['ac_id']} contained in exactly 1 mechanical room",
+                    len(contained) == 1 and contained[0]["type"] == "mechanical",
+                    f"found {contained}",
                 )
 
             for dorm in dorms:
                 sensors = q(
                     session,
-                    "MATCH (r:Room {number: $number})-[:HAS_SENSOR]->(s:Sensor) "
-                    "RETURN s.label AS label, s.type AS type",
-                    number=dorm["number"],
+                    "MATCH (r:Room {room_number: $room_number})-[:HAS_SENSOR]->(s:Sensor) "
+                    "RETURN s.sensor_id AS sensor_id, s.sensor_type AS sensor_type",
+                    room_number=dorm["room_number"],
                 )
-                types = sorted(s["type"] for s in sensors)
+                types = sorted(s["sensor_type"] for s in sensors)
                 check(
-                    f"room {dorm['number']} has exactly 1 temperature + 1 occupancy sensor",
+                    f"room {dorm['room_number']} has exactly 1 temperature + 1 occupancy sensor",
                     types == ["occupancy", "temperature"],
                     f"found {types}",
                 )
@@ -82,40 +82,40 @@ def main():
             for m in mech:
                 sensors = q(
                     session,
-                    "MATCH (r:Room {number: $number})-[:HAS_SENSOR]->(s:Sensor) RETURN s",
-                    number=m["number"],
+                    "MATCH (r:Room {room_number: $room_number})-[:HAS_SENSOR]->(s:Sensor) RETURN s",
+                    room_number=m["room_number"],
                 )
                 check(
-                    f"mechanical room {m['number']} has no sensors",
+                    f"mechanical room {m['room_number']} has no sensors",
                     len(sensors) == 0,
                     f"found {len(sensors)}",
                 )
 
-            temp_sensors = q(session, "MATCH (s:Sensor {type: 'temperature'}) RETURN s.label AS label")
+            temp_sensors = q(session, "MATCH (s:Sensor {sensor_type: 'temperature'}) RETURN s.sensor_id AS sensor_id")
             for ts in temp_sensors:
-                monitors = q(
+                reports = q(
                     session,
-                    "MATCH (s:Sensor {label: $label})-[:MONITORS_FOR]->(a:ACUnit) RETURN a.label AS label",
-                    label=ts["label"],
+                    "MATCH (s:Sensor {sensor_id: $sensor_id})-[:REPORTS_TO]->(a:AC_Unit) RETURN a.ac_id AS ac_id",
+                    sensor_id=ts["sensor_id"],
                 )
                 has_one = check(
-                    f"{ts['label']} has exactly 1 MONITORS_FOR edge",
-                    len(monitors) == 1,
-                    f"found {len(monitors)}",
+                    f"{ts['sensor_id']} has exactly 1 REPORTS_TO edge",
+                    len(reports) == 1,
+                    f"found {len(reports)}",
                 )
                 if has_one:
                     servicing = q(
                         session,
-                        "MATCH (s:Sensor {label: $label})<-[:HAS_SENSOR]-(r:Room) "
-                        "MATCH (a:ACUnit)-[:SERVICES]->(r) "
-                        "RETURN a.label AS label",
-                        label=ts["label"],
+                        "MATCH (s:Sensor {sensor_id: $sensor_id})<-[:HAS_SENSOR]-(r:Room) "
+                        "MATCH (a:AC_Unit)-[:SERVICES]->(r) "
+                        "RETURN a.ac_id AS ac_id",
+                        sensor_id=ts["sensor_id"],
                     )
-                    servicing_labels = {row["label"] for row in servicing}
+                    servicing_ids = {row["ac_id"] for row in servicing}
                     check(
-                        f"{ts['label']}'s MONITORS_FOR AC matches its room's SERVICES AC",
-                        monitors[0]["label"] in servicing_labels,
-                        f"MONITORS_FOR={monitors[0]['label']}, SERVICES={servicing_labels}",
+                        f"{ts['sensor_id']}'s REPORTS_TO AC matches its room's SERVICES AC",
+                        reports[0]["ac_id"] in servicing_ids,
+                        f"REPORTS_TO={reports[0]['ac_id']}, SERVICES={servicing_ids}",
                     )
     finally:
         driver.close()

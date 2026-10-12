@@ -24,17 +24,17 @@ def get_rooms_serviced_by_ac(ac_label: str | None = None) -> dict:
             if ac_label is not None:
                 rows = run_read_only(
                     session,
-                    "MATCH (a:ACUnit {label: $ac_label})-[:SERVICES]->(r:Room) "
-                    "RETURN a.label AS ac_label, r.number AS room_number "
-                    "ORDER BY r.number",
-                    ac_label=ac_label,
+                    "MATCH (a:AC_Unit {ac_id: $ac_id})-[:SERVICES]->(r:Room) "
+                    "RETURN a.ac_id AS ac_label, r.room_number AS room_number "
+                    "ORDER BY r.room_number",
+                    ac_id=ac_label,
                 ).data()
             else:
                 rows = run_read_only(
                     session,
-                    "MATCH (a:ACUnit)-[:SERVICES]->(r:Room) "
-                    "RETURN a.label AS ac_label, r.number AS room_number "
-                    "ORDER BY a.label, r.number",
+                    "MATCH (a:AC_Unit)-[:SERVICES]->(r:Room) "
+                    "RETURN a.ac_id AS ac_label, r.room_number AS room_number "
+                    "ORDER BY a.ac_id, r.room_number",
                 ).data()
     finally:
         driver.close()
@@ -63,7 +63,7 @@ def get_ac_for_room(room_number: str) -> dict:
         with driver.session() as session:
             rows = run_read_only(
                 session,
-                "MATCH (a:ACUnit)-[:SERVICES]->(r:Room {number: $room_number}) RETURN a.label AS ac_label",
+                "MATCH (a:AC_Unit)-[:SERVICES]->(r:Room {room_number: $room_number}) RETURN a.ac_id AS ac_label",
                 room_number=room_number,
             ).data()
     finally:
@@ -88,22 +88,22 @@ def get_room_info(room_number: str) -> dict:
     try:
         with driver.session() as session:
             room_row = run_read_only(
-                session, "MATCH (r:Room {number: $room_number}) RETURN r.type AS type", room_number=room_number
+                session, "MATCH (r:Room {room_number: $room_number}) RETURN r.type AS type", room_number=room_number
             ).data()
             sensors = run_read_only(
                 session,
-                "MATCH (r:Room {number: $room_number})-[:HAS_SENSOR]->(s:Sensor) "
-                "RETURN s.label AS label, s.type AS type ORDER BY s.type",
+                "MATCH (r:Room {room_number: $room_number})-[:HAS_SENSOR]->(s:Sensor) "
+                "RETURN s.sensor_id AS label, s.sensor_type AS type ORDER BY s.sensor_type",
                 room_number=room_number,
             ).data()
             serviced_by = run_read_only(
                 session,
-                "MATCH (a:ACUnit)-[:SERVICES]->(r:Room {number: $room_number}) RETURN a.label AS ac_label",
+                "MATCH (a:AC_Unit)-[:SERVICES]->(r:Room {room_number: $room_number}) RETURN a.ac_id AS ac_label",
                 room_number=room_number,
             ).data()
             houses = run_read_only(
                 session,
-                "MATCH (a:ACUnit)-[:LOCATED_IN]->(r:Room {number: $room_number}) RETURN a.label AS ac_label",
+                "MATCH (r:Room {room_number: $room_number})-[:CONTAINS]->(a:AC_Unit) RETURN a.ac_id AS ac_label",
                 room_number=room_number,
             ).data()
     finally:

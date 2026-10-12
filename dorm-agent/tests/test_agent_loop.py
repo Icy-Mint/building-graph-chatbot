@@ -96,13 +96,13 @@ def test_ask_calls_a_tool_and_feeds_the_result_back():
             [FakeToolUseBlock("call_1", "get_ac_for_room", {"room_number": "101"})],
             stop_reason="tool_use",
         ),
-        FakeMessage([FakeTextBlock("Room 101 is serviced by AC-1.")], stop_reason="end_turn"),
+        FakeMessage([FakeTextBlock("Room 101 is serviced by AC1.")], stop_reason="end_turn"),
     ])
-    dispatcher = fake_tool_dispatcher([{"status": "ok", "room_number": "101", "ac_label": "AC-1"}])
+    dispatcher = fake_tool_dispatcher([{"status": "ok", "room_number": "101", "ac_label": "AC1"}])
 
     result = ask("Which AC services room 101?", client=client, tool_dispatcher=dispatcher)
 
-    assert result["answer"] == "Room 101 is serviced by AC-1."
+    assert result["answer"] == "Room 101 is serviced by AC1."
     assert len(result["tool_calls"]) == 1
     assert result["tool_calls"][0]["tool"] == "get_ac_for_room"
     assert result["tool_calls"][0]["status"] == "ok"
@@ -113,7 +113,7 @@ def test_ask_calls_a_tool_and_feeds_the_result_back():
     tool_result_content = second_call_messages[-1]["content"][0]
     assert tool_result_content["type"] == "tool_result"
     assert tool_result_content["tool_use_id"] == "call_1"
-    assert json.loads(tool_result_content["content"])["ac_label"] == "AC-1"
+    assert json.loads(tool_result_content["content"])["ac_label"] == "AC1"
     assert tool_result_content["is_error"] is False
 
 
@@ -145,16 +145,16 @@ def test_ask_lets_the_model_retry_a_tool_with_corrected_arguments():
     client = FakeAnthropicClient([
         FakeMessage([FakeToolUseBlock("call_1", "get_ac_for_room", {"room_number": "101"})], stop_reason="tool_use"),
         FakeMessage([FakeToolUseBlock("call_2", "get_ac_for_room", {"room_number": "101"})], stop_reason="tool_use"),
-        FakeMessage([FakeTextBlock("Room 101 is serviced by AC-1.")], stop_reason="end_turn"),
+        FakeMessage([FakeTextBlock("Room 101 is serviced by AC1.")], stop_reason="end_turn"),
     ])
     dispatcher = fake_tool_dispatcher([
         {"status": "error", "reason": "Unknown room '101'.", "valid_rooms": ["101"]},
-        {"status": "ok", "room_number": "101", "ac_label": "AC-1"},
+        {"status": "ok", "room_number": "101", "ac_label": "AC1"},
     ])
 
     result = ask("Which AC services room 101?", client=client, tool_dispatcher=dispatcher)
 
-    assert result["answer"] == "Room 101 is serviced by AC-1."
+    assert result["answer"] == "Room 101 is serviced by AC1."
     assert [c["status"] for c in result["tool_calls"]] == ["error", "ok"]
     assert len(client.messages.calls) == 3
 

@@ -59,7 +59,7 @@ def test_sun_rooms_run_warmer_on_average_than_shaded_rooms():
 
 def test_each_ac_unit_has_rooms_from_both_temp_profiles():
     """Encodes the spec's explicit requirement that temperature-profile
-    assignment cuts across AC groupings (e.g. 'AC-1 services 2 sun rooms
+    assignment cuts across AC groupings (e.g. 'AC1 services 2 sun rooms
     and 1 shaded room') as a real test, not just a comment in model.py."""
     for ac_label, info in AC_ASSIGNMENTS.items():
         profiles = {room_temp_profile(r) for r in info["dorms"]}

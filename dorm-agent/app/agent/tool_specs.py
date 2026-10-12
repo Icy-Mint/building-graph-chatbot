@@ -21,7 +21,7 @@ TOOLS = [
             "properties": {
                 "ac_label": {
                     "type": ["string", "null"],
-                    "description": "e.g. 'AC-1' or 'AC-2'. Omit or pass null for all AC units.",
+                    "description": "e.g. 'AC1' or 'AC2'. Omit or pass null for all AC units.",
                 },
             },
         },
