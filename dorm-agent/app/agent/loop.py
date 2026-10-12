@@ -18,6 +18,7 @@ from app.agent.tool_specs import TOOLS, call_tool
 
 DEFAULT_MODEL = "claude-sonnet-5"
 MAX_ITERATIONS = 5
+MAX_TOKENS = 2048
 
 
 def _json_default(obj):
@@ -88,13 +89,31 @@ def ask(
 
     for _ in range(max_iterations):
         response = client.messages.create(
-            model=model, max_tokens=1024, system=system, tools=tools, messages=messages
+            model=model,
+            max_tokens=MAX_TOKENS,
+            system=system,
+            tools=tools,
+            # claude-sonnet-5 produces an extended-thinking block by default
+            # (confirmed live: it consumed an entire 1024-token budget before
+            # ever reaching a tool call or an answer, stop_reason="max_tokens").
+            # This agent dispatches to simple typed tools -- it doesn't need
+            # deep reasoning, so thinking is disabled for speed/cost/predictability.
+            thinking={"type": "disabled"},
+            messages=messages,
         )
         _accumulate_usage(response)
         messages.append({"role": "assistant", "content": response.content})
 
         if response.stop_reason != "tool_use":
             final_text = "".join(block.text for block in response.content if block.type == "text")
+            if not final_text and response.stop_reason == "max_tokens":
+                # Never silently return an empty answer -- say plainly what
+                # happened instead of looking like a model that had nothing
+                # to say.
+                final_text = (
+                    "[No answer was produced -- the response was truncated at the "
+                    f"{MAX_TOKENS}-token limit before any text was generated.]"
+                )
             break
 
         tool_results = []
@@ -126,8 +145,9 @@ def ask(
         hit_cap = True
         response = client.messages.create(
             model=model,
-            max_tokens=1024,
+            max_tokens=MAX_TOKENS,
             system=system,
+            thinking={"type": "disabled"},
             messages=messages + [{
                 "role": "user",
                 "content": (
@@ -139,6 +159,11 @@ def ask(
         )
         _accumulate_usage(response)
         final_text = "".join(block.text for block in response.content if block.type == "text")
+        if not final_text and response.stop_reason == "max_tokens":
+            final_text = (
+                "[No answer was produced -- the response was truncated at the "
+                f"{MAX_TOKENS}-token limit before any text was generated.]"
+            )
 
     total_latency_ms = round((time.time() - start_time) * 1000)
 

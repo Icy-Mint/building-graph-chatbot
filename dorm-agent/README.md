@@ -10,19 +10,14 @@ This is a separate subproject from the Streamlit bots one level up
 Docker Compose, Claude tool-use agent vs. single-file Streamlit apps),
 different dependencies, its own venv.
 
-## Status: Step 4 of 6 (agent loop — code complete, NOT verified live)
+## Status: Step 4 of 6 — verified live
 
 The Neo4j graph model, the TimescaleDB time-series generator, the tool
-layer, and the agent loop are built. **No `ANTHROPIC_API_KEY` has been
-available at any point during this project**, so unlike every other step,
-Step 4 has only been tested with a fake Anthropic client (see
-`tests/test_agent_loop.py`) — its control flow (tool_use handling, retry
-within budget, iteration cap, never overriding a decline) is verified, but
-it has never actually talked to the real API. The request shape (model ID,
-`cache_control` placement, `system`/`tools` structure) is believed correct
-based on the installed SDK's own type definitions, not confirmed by a live
-call. Run it against the real API before trusting it. Steps 5–6 (FastAPI/
-Streamlit UI, eval harness) are not started.
+layer, and the agent loop are all built and now confirmed against the real
+Anthropic API (an `ANTHROPIC_API_KEY` became available after Step 4 was
+first built against a fake client only — see "Live verification" below for
+what that first real run caught). Steps 5–6 (FastAPI/Streamlit UI, eval
+harness) are not started.
 
 ## Graph model
 
@@ -168,11 +163,38 @@ feeding the error back and bounding total iterations.
 - **Prompt-injection guidance**: the system prompt explicitly tells the
   model to treat tool results as data, never as instructions — relevant to
   the eval harness's planned injection test case (Step 6).
+- **"Current" is defined explicitly**: the sensor data is historical and the
+  model has no real-world clock, so the system prompt tells it to treat
+  "current"/"right now" as "the most recent reading available" and how to
+  find it (a wide `agg="hourly"` query, not a guessed narrow window) — see
+  "Two real bugs" below for why this line exists.
 
-**Verified**: the loop's control flow, with a fake Anthropic client (7
-tests) — tool dispatch, error feedback, retry-within-budget, the iteration
-cap, and usage accumulation. **Not verified**: an actual call to the real
-Anthropic API (see the status note at the top of this file).
+**Verified two ways**: the loop's control flow with a fake Anthropic client
+(7 tests, no API key needed) — tool dispatch, error feedback,
+retry-within-budget, the iteration cap, usage accumulation — and, once a
+key became available, live against the real API.
+
+**Two real bugs the live run caught that the fake-client tests couldn't**:
+1. `claude-sonnet-5` produces an extended-thinking block by default, and
+   that consumed the entire original `max_tokens=1024` budget before ever
+   reaching an answer or a tool call (`stop_reason: "max_tokens"`, empty
+   response). This agent dispatches to simple typed tools — it doesn't need
+   deep reasoning — so `thinking={"type": "disabled"}` is now passed
+   explicitly, and `max_tokens` raised to 2048 as margin. The loop also no
+   longer silently returns an empty string on truncation; it says so.
+2. Asked "what's the current temperature in room 101," the model correctly
+   noticed it has no live clock (the data is historical) but then guessed
+   an arbitrary narrow window near the *start* of history instead of
+   finding the *actual* latest reading — appropriately cautious in tone,
+   but not actually correct. Fixed with the system-prompt guidance above;
+   re-verified live afterward: it correctly found the true latest reading
+   (`2024-01-14T23:55:00Z`, confirmed against the generator's actual date
+   range), resolved the AC relationship, used all 5 tool-call iterations
+   doing so, and explicitly said it had hit the iteration cap — the first
+   live, real-world confirmation of nearly the entire Step 4 design working
+   together end-to-end (also a notable cost/latency data point for the
+   eventual comparison: 5 tool calls for something `chatbotForecast.py`
+   answers in one query).
 
 ## Running Steps 1–4
 
