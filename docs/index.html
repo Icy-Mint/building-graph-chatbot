@@ -430,6 +430,34 @@
     </div>
   </section>
 
+  <section id="next">
+    <div class="section-head"><span class="section-num">05</span><h2 class="section-title">What's next</h2></div>
+    <p>Two different directions, not one &mdash; closing the cost/latency gap this page measured, and
+      testing all three architectures against data that isn't designed to be clean.</p>
+
+    <div class="arch-row" style="grid-template-columns:repeat(2,1fr)">
+      <div class="arch-card" style="--c:var(--sys-da)">
+        <div class="name">Make the agent cheaper, not just document it</div>
+        <div class="how">Two concrete, unbuilt fixes, not things already tried and found insufficient:
+          extend Anthropic's prompt caching across the growing tool-call conversation itself (today only
+          the system prompt + tool list are cached; every tool result gets re-sent at full price on every
+          later turn, which is the actual driver of the 48&times; token gap) and build the cheap/capable
+          model router that was planned but never implemented &mdash; every question currently gets
+          claude-sonnet-5 regardless of how trivial it is.</div>
+      </div>
+      <div class="arch-card" style="--c:var(--sys-cf)">
+        <div class="name">Test against real building data</div>
+        <div class="how">This database is a deliberately small, deterministic stand-in so every
+          ground-truth answer could be checked exactly. The natural next step is pointing the same three
+          architectures at a real source: a building management system (BMS) export or live API, a sensor
+          manufacturer's cloud API, or a managed IoT platform (AWS IoT Core, Azure IoT Hub / Digital
+          Twins) streaming live telemetry. That surfaces what this demo can't: real sensor dropouts and
+          data gaps, auth/rate-limits on the data side, multi-building schemas nobody hand-designed to be
+          clean, and whether typed-tool and NL-to-Cypher still hold up once the graph isn't tidy.</div>
+      </div>
+    </div>
+  </section>
+
   <footer>
     <p><b>Scope and limitations:</b> one model (claude-sonnet-5), one synthetic 14-day dataset, one grading
       pass per answer (automated keyword/number matching against ground truth, with one documented
