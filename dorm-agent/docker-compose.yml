@@ -7,6 +7,13 @@ services:
       - "7687:7687" # bolt
     environment:
       NEO4J_AUTH: ${NEO4J_USERNAME}/${NEO4J_PASSWORD}
+      # Aura has APOC available by default; this image doesn't unless asked.
+      # chatbotForecast.py's Neo4jGraph wrapper calls apoc.meta.data() during
+      # schema introspection (used by GraphCypherQAChain's validate_cypher
+      # relationship-direction check) and fails outright without this --
+      # needed only because that file now also targets this database, not
+      # by anything dorm-agent's own code uses.
+      NEO4J_PLUGINS: '["apoc"]'
     volumes:
       - neo4j_data:/data
     healthcheck:
