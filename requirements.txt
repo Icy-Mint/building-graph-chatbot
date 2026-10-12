@@ -17,11 +17,12 @@ pytest
 langchain-core<1.0.0
 langsmith<0.4
 
-# Optional: only needed if LLM_PROVIDER is set to "gemini" or "groq" in .env.
-# Pinned below 3.x / 1.x respectively because those lines require
+# Optional: only needed if LLM_PROVIDER is set to "gemini", "groq", or
+# "anthropic" in .env. Pinned below the versions that require
 # langchain-core>=1.0, which conflicts with the pin above.
 langchain-google-genai<3
 langchain-groq<1
+langchain-anthropic<1
 
 # Note: langchain-google-genai also pulls in protobuf>=6.33.5, which conflicts
 # with some other common packages (e.g. tensorflow caps protobuf<6, older

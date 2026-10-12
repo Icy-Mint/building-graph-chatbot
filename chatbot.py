@@ -30,11 +30,13 @@ _DEFAULT_MODELS = {
     "openai": "gpt-4",
     "gemini": "gemini-3.8-flash",
     "groq": "llama-3.3-70b-versatile",
+    "anthropic": "claude-sonnet-5",
 }
 _PROVIDER_API_KEY_ENV = {
     "openai": "OPENAI_API_KEY",
     "gemini": "GOOGLE_API_KEY",
     "groq": "GROQ_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
 }
 
 LLM_MODEL_NAME = os.getenv("LLM_MODEL") or _DEFAULT_MODELS.get(LLM_PROVIDER)
@@ -54,8 +56,9 @@ def require_env_vars() -> None:
 
 
 def _build_llm():
-    """Pick the chat model from LLM_PROVIDER (openai/gemini/groq). Non-default
-    providers are imported lazily so their packages are only needed if used."""
+    """Pick the chat model from LLM_PROVIDER (openai/gemini/groq/anthropic).
+    Non-default providers are imported lazily so their packages are only
+    needed if used."""
     model = LLM_MODEL_NAME
 
     if LLM_PROVIDER == "openai":
@@ -68,6 +71,10 @@ def _build_llm():
     if LLM_PROVIDER == "groq":
         from langchain_groq import ChatGroq
         return ChatGroq(model=model, temperature=0, groq_api_key=os.getenv("GROQ_API_KEY"))
+
+    if LLM_PROVIDER == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+        return ChatAnthropic(model=model, temperature=0, anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"))
 
     raise ValueError(f"Unknown LLM_PROVIDER '{LLM_PROVIDER}'. Use one of: {', '.join(_DEFAULT_MODELS)}")
 
