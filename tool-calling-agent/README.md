@@ -22,12 +22,18 @@ harness) are not started.
 ## Graph model
 
 ```
-(:Building)-[:HAS_ROOM]->(:Room {number, type})
-(:ACUnit {label})-[:LOCATED_IN]->(:Room {type: "mechanical"})
-(:ACUnit)-[:SERVICES]->(:Room {type: "dorm"})          exactly 3 dorms per AC
-(:Room)-[:HAS_SENSOR]->(:Sensor {label, type})         type: temperature | occupancy
-(:Sensor {type: "temperature"})-[:MONITORS_FOR]->(:ACUnit)
+(:Building)-[:HAS_ROOM]->(:Room {room_number, type})
+(:Room {type: "mechanical"})-[:CONTAINS]->(:AC_Unit {ac_id})
+(:AC_Unit)-[:SERVICES]->(:Room {type: "dorm"})              exactly 3 dorms per AC
+(:Room)-[:HAS_SENSOR]->(:Sensor {sensor_id, sensor_type})   sensor_type: temperature | occupancy
+(:Sensor {sensor_type: "temperature"})-[:REPORTS_TO]->(:AC_Unit)
+(:Sensor)-[:RECORDED]->(:Reading {timestamp, value, sensor_type, room_number})
 ```
+
+(Standardized to match `chatbot_classifier.py`/`chatbot_nl2cypher.py`'s existing Aura
+schema -- see "Shared local database" below. `Reading` nodes are a
+duplicate of TimescaleDB's `sensor_readings`, loaded by
+`app/graph/load_readings.py`; TimescaleDB stays the source of truth.)
 
 8 rooms (101–106 dorm, 201–202 mechanical), 2 AC units, each dorm room has
 one temperature and one occupancy sensor. Mechanical rooms intentionally
@@ -63,7 +69,7 @@ weekend hour-of-day patterns, so there's real day-of-week signal for
 `validate.py` checks: exactly 8 rooms (6 dorm / 2 mechanical), exactly 2 AC
 units each servicing exactly 3 dorm rooms, every dorm has exactly one
 temperature + one occupancy sensor, every mechanical room has none, and
-every temperature sensor's `MONITORS_FOR` edge points to the same AC unit
+every temperature sensor's `REPORTS_TO` edge points to the same AC unit
 that `SERVICES` its room (graph-path consistency, not just node counts).
 
 `generate.py` is deterministic given `--seed` (verified: same seed → byte-
@@ -193,7 +199,7 @@ key became available, live against the real API.
    doing so, and explicitly said it had hit the iteration cap — the first
    live, real-world confirmation of nearly the entire Step 4 design working
    together end-to-end (also a notable cost/latency data point for the
-   eventual comparison: 5 tool calls for something `chatbot_nl2cypher.py`
+   three-way comparison below: 5 tool calls for something `chatbot_nl2cypher.py`
    answers in one query).
 
 ## Running Steps 1–4
@@ -221,6 +227,13 @@ pytest   # 62 tests: offline model/safety/agent-loop checks + live tool-layer te
 python -c "from app.agent.loop import ask; print(ask('Which rooms does AC1 service?'))"
 ```
 
+`docker-compose.yml`'s top-level `name: dorm-agent` is intentional, not a
+leftover from before this folder was renamed -- it pins the Compose
+project identity so the already-seeded `neo4j_data`/`timescale_data`
+volumes and the `dorm-agent-neo4j`/`dorm-agent-timescaledb` containers
+keep resolving correctly regardless of what the folder itself is called.
+Don't change it without migrating those volumes first.
+
 ## Shared local database (optional)
 
 This Neo4j database can be used as a local, self-hosted alternative to the
@@ -238,7 +251,21 @@ single-Cypher-query design (which expects sensor data to live in Neo4j) has
 something to query. Re-run it after `generate.py` if you regenerate with a
 different seed/date range -- it always clears and reloads, never appends.
 
+## Three-way comparison
+
+[`compare_systems.py`](../compare_systems.py), one level up, runs this
+agent, `chatbot_classifier.py`, and `chatbot_nl2cypher.py` against the
+same local Neo4j/TimescaleDB and the same model (`claude-sonnet-5`) over
+107 questions, with ground truth computed directly from the database. Full
+write-up -- method, results, and where each architecture actually breaks:
+**[icy-mint.github.io/building-graph-chatbot](https://icy-mint.github.io/building-graph-chatbot/)**
+(source: `../docs/index.html`). Raw results: `../compare_systems_results_full.json`.
+
 ## Roadmap (not yet built)
 
 5. FastAPI + Streamlit UI
-6. Eval harness (25+ golden cases, deterministic scoring, drift guard)
+6. A dedicated eval harness scoped to just this agent (25+ golden cases,
+   deterministic scoring, a prompt-injection test case, a drift guard) --
+   distinct from the repo-level `compare_systems.py` comparison above,
+   which covers accuracy/cost/latency across all three systems but not
+   this file's originally planned injection/drift checks.
