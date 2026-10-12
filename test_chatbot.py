@@ -56,39 +56,47 @@ def make_sensor_helper():
     return sh
 
 
-def classify(action, room):
-    """A chain response shaped like the real LLM's structured output."""
-    room_json = "null" if room is None else repr(room) if isinstance(room, int) else f'"{room}"'
-    return f'```json\n{{"action": "{action}", "room": {room_json}}}\n```'
+def classify(action, rooms=None):
+    """A chain response shaped like the real LLM's structured output. `rooms`
+    may be a single value (wrapped into a one-item list), a list (for
+    multi-room questions), or None/omitted (empty list)."""
+    if rooms is None:
+        room_list = []
+    elif isinstance(rooms, list):
+        room_list = rooms
+    else:
+        room_list = [rooms]
+    rooms_json = "[" + ", ".join(f'"{r}"' for r in room_list) + "]"
+    return f'```json\n{{"action": "{action}", "rooms": {rooms_json}}}\n```'
 
 
 def test_alltime_hottest_with_known_room_returns_that_room_only():
     chain = FakeChain([classify("alltime_hottest", "101")])
     sensor_helper = make_sensor_helper()
 
-    answer, action, room = ask(
+    answer, action, rooms = ask(
         "what's the highest temperature room 101 has ever recorded?",
         chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
     )
 
     assert "Room 101" in answer and "102" not in answer
     assert action == "alltime_hottest"
-    assert room == "101"
+    assert rooms == ["101"]
 
 
 def test_room_returned_as_int_is_normalized_to_string():
-    """Regression test: the LLM can return room as a bare JSON number (not a
-    quoted string). sh.tables is keyed by strings, so without normalizing,
-    `room in sensor_helper.tables` would silently miss and fall through to
-    "all rooms" instead of answering about the specific room asked."""
+    """Regression test: the LLM can return a room as a bare JSON number (not
+    a quoted string) inside the rooms list. sh.tables is keyed by strings,
+    so without normalizing, membership checks would silently miss and fall
+    through to "all rooms" instead of answering about the room asked."""
     chain = FakeChain([classify("alltime_hottest", 101)])
     sensor_helper = make_sensor_helper()
 
-    answer, action, room = ask(
+    answer, action, rooms = ask(
         "highest ever in room 101?", chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
     )
 
-    assert room == "101"
+    assert rooms == ["101"]
     assert "Room 101" in answer and "Room 102" not in answer
 
 
@@ -96,13 +104,45 @@ def test_no_room_returns_all_rooms():
     chain = FakeChain([classify("alltime_coldest", None)])
     sensor_helper = make_sensor_helper()
 
-    answer, action, room = ask(
+    answer, action, rooms = ask(
         "what's the lowest temperature ever recorded in any room?",
         chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
     )
 
     assert "Room 101" in answer and "Room 102" in answer
-    assert room is None
+    assert rooms == []
+
+
+def test_multiple_rooms_reports_only_those_rooms_not_all_rooms():
+    """The fix for chatbot.py's single-room limit: "compare 101 and 102"
+    should answer about exactly those two, not fall back to every room."""
+    chain = FakeChain([classify("current_temp", ["101", "102"])])
+    sensor_helper = make_sensor_helper()
+
+    answer, action, rooms = ask(
+        "compare the current temperature in room 101 and room 102",
+        chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+    )
+
+    assert rooms == ["101", "102"]
+    assert "room 101" in answer and "room 102" in answer
+
+
+def test_multiple_rooms_with_one_invalid_falls_back_to_all_rooms():
+    """Matches the existing single-invalid-room behavior: if NONE of the
+    requested rooms are valid, fall back to all rooms rather than erroring --
+    this test uses one valid + one invalid room, which already contains a
+    valid room, so it should report just that one, not every room."""
+    chain = FakeChain([classify("current_temp", ["101", "999"])])
+    sensor_helper = make_sensor_helper()
+
+    answer, action, rooms = ask(
+        "what about room 101 and room 999?",
+        chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+    )
+
+    assert "room 101" in answer
+    assert "room 102" not in answer  # 102 wasn't asked about and isn't invalid -- shouldn't appear
 
 
 # ───────────────────────────────────────────────────────────────────────
@@ -291,7 +331,7 @@ def test_malformed_classification_output_returns_error_without_crashing():
 
     assert answer.startswith("❌")
     assert action is None
-    assert room is None
+    assert room == []
 
 
 def test_usage_callback_fires_exactly_once_with_a_dict():

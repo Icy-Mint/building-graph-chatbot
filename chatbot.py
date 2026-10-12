@@ -222,7 +222,11 @@ response_schemas = [
         "alltime_coldest, current_occupancy, occupancy_pattern, occupancy_forecast, "
         "ac_mapping, fallback"
     )),
-    ResponseSchema(name="room", description="Room number if mentioned, else null")
+    ResponseSchema(name="rooms", description=(
+        "A JSON list of every room number mentioned, as strings, e.g. [\"101\"] for "
+        "one room or [\"101\", \"104\"] for a comparison between rooms. Empty list "
+        "[] if no room is mentioned."
+    )),
 ]
 parser = StructuredOutputParser.from_response_schemas(response_schemas)
 
@@ -236,10 +240,11 @@ current_* actions unless the user explicitly says "ever", "historically",
 
 - current_hottest: which room is hottest right now (no specific room, present tense)
 - current_coldest: which room is coldest right now
-- current_temp: the current/right-now temperature in a SPECIFIC room
+- current_temp: the current/right-now temperature in one or more SPECIFIC rooms
+  (including a comparison like "compare room 101 and 104")
 - alltime_hottest: the highest temperature EVER recorded (explicitly historical)
 - alltime_coldest: the lowest temperature ever recorded (explicitly historical)
-- current_occupancy: whether a SPECIFIC room is occupied right now (yes/no status)
+- current_occupancy: whether one or more SPECIFIC rooms are occupied right now (yes/no status)
 - occupancy_pattern: when a room is typically/usually occupied (a pattern across hours, not current status)
 - occupancy_forecast: a FUTURE/predicted occupancy question (e.g. "will", "forecast", "predict", "next hour") -- not current or historical status
 - ac_mapping: user asks which AC unit services which rooms
@@ -311,17 +316,38 @@ def log_interaction(entry: dict) -> None:
 # Dependency-injected (chains/helpers passed in, not read from globals) so it
 # can be unit-tested with fakes — no Streamlit runtime, no live Neo4j/OpenAI.
 # ─────────────────────────────────────────
+def _normalize_rooms(raw_rooms) -> list:
+    """The LLM is asked for a JSON list but may still return a bare string/
+    number, or null/omit the field entirely -- normalize all of those into
+    a plain list of strings so dispatch never has to special-case the shape."""
+    if raw_rooms is None:
+        return []
+    if isinstance(raw_rooms, list):
+        return [str(r) for r in raw_rooms]
+    return [str(raw_rooms)]
+
+
+def _target_rooms(rooms: list, sensor_helper) -> list:
+    """Rooms actually requested that exist, or every room if none were
+    requested (or none of the requested ones were valid) -- lets a single
+    room, a multi-room comparison (e.g. "compare 101 and 104"), and "no room
+    specified" all share one dispatch pattern instead of three."""
+    valid = [r for r in rooms if r in sensor_helper.tables]
+    return valid if valid else list(sensor_helper.tables.keys())
+
+
 def ask(query, classification_chain, fallback_chain, parser, graph_helper, sensor_helper, usage_callback=None):
     """Classify the question into a fixed action set, then dispatch to pandas
-    (sensor CSVs) or a hardcoded Cypher query. Returns (answer, action, room);
-    action/room are None if classification itself failed.
+    (sensor CSVs) or a hardcoded Cypher query. Returns (answer, action, rooms);
+    rooms is always a list (possibly empty); action/rooms are (None, []) if
+    classification itself failed.
 
     usage_callback, if given, is called once with a {model: {input_tokens,
     output_tokens, ...}} dict (aggregated across every LLM call this turn
     made -- classification, and the fallback chain if it ran) before
     returning, mirroring the on_attempt pattern in chatbotForecast.ask_graph:
     extra observability without changing this function's existing
-    (answer, action, room) return shape that callers and tests rely on.
+    (answer, action, rooms) return shape that callers and tests rely on.
     """
     cb = UsageMetadataCallbackHandler()
 
@@ -330,14 +356,10 @@ def ask(query, classification_chain, fallback_chain, parser, graph_helper, senso
     except Exception as e:
         if usage_callback:
             usage_callback(cb.usage_metadata)
-        return f"❌ Failed to classify query: {e}", None, None
+        return f"❌ Failed to classify query: {e}", None, []
 
     action = parsed.get("action")
-    room = parsed.get("room")
-    room = str(room) if room is not None else None  # the LLM sometimes returns
-    # room as a bare JSON number instead of a string; sh.tables is keyed by
-    # strings, so an un-normalized int room would silently fail the `in`
-    # check below and fall through to "all rooms" instead of erroring.
+    rooms = _normalize_rooms(parsed.get("rooms"))
 
     try:
         if action == "current_hottest":
@@ -347,40 +369,26 @@ def ask(query, classification_chain, fallback_chain, parser, graph_helper, senso
             answer = sensor_helper.current_coldest_room()
 
         elif action == "current_temp":
-            if room and room in sensor_helper.tables:
-                answer = sensor_helper.current_temp(room)
-            else:
-                answer = "\n".join(sensor_helper.current_temp(r) for r in sensor_helper.tables)
+            answer = "\n".join(sensor_helper.current_temp(r) for r in _target_rooms(rooms, sensor_helper))
 
         elif action == "alltime_hottest":
-            if room and room in sensor_helper.tables:
-                answer = sensor_helper.hottest(room)
-            else:
-                answer = "\n".join(sensor_helper.hottest(r) for r in sensor_helper.tables)
+            answer = "\n".join(sensor_helper.hottest(r) for r in _target_rooms(rooms, sensor_helper))
 
         elif action == "alltime_coldest":
-            if room and room in sensor_helper.tables:
-                answer = sensor_helper.coldest(room)
-            else:
-                answer = "\n".join(sensor_helper.coldest(r) for r in sensor_helper.tables)
+            answer = "\n".join(sensor_helper.coldest(r) for r in _target_rooms(rooms, sensor_helper))
 
         elif action == "current_occupancy":
-            if room and room in sensor_helper.tables:
-                answer = sensor_helper.current_occupancy(room)
-            else:
-                answer = "\n".join(sensor_helper.current_occupancy(r) for r in sensor_helper.tables)
+            answer = "\n".join(sensor_helper.current_occupancy(r) for r in _target_rooms(rooms, sensor_helper))
 
         elif action == "occupancy_pattern":
-            if room and room in sensor_helper.tables:
-                answer = sensor_helper.occupancy_pattern(room)
-            else:
-                answer = "\n".join(sensor_helper.occupancy_pattern(r) for r in sensor_helper.tables)
+            answer = "\n".join(sensor_helper.occupancy_pattern(r) for r in _target_rooms(rooms, sensor_helper))
 
         elif action == "occupancy_forecast":
-            if room and room in sensor_helper.tables:
-                answer = sensor_helper.occupancy_forecast(room)
+            valid = [r for r in rooms if r in sensor_helper.tables]
+            if valid:
+                answer = "\n".join(sensor_helper.occupancy_forecast(r) for r in valid)
             else:
-                answer = sensor_helper.occupancy_forecast()
+                answer = sensor_helper.occupancy_forecast()  # whole-building summary
 
         elif action == "ac_mapping":
             result = graph_helper("""
@@ -404,11 +412,11 @@ def ask(query, classification_chain, fallback_chain, parser, graph_helper, senso
     except Exception as e:
         if usage_callback:
             usage_callback(cb.usage_metadata)
-        return f"❌ Failed to answer query: {e}", action, room
+        return f"❌ Failed to answer query: {e}", action, rooms
 
     if usage_callback:
         usage_callback(cb.usage_metadata)
-    return answer, action, room
+    return answer, action, rooms
 
 
 def _is_error(answer: str) -> bool:
@@ -445,7 +453,7 @@ def main():
             usage = {}
             with st.spinner("Thinking..."):
                 start_time = time.time()
-                answer, action, room = ask(
+                answer, action, rooms = ask(
                     query, classification_chain, fallback_chain, parser, graph_helper, sensor_helper,
                     usage_callback=usage.update,
                 )
@@ -455,7 +463,7 @@ def main():
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "question": query,
                 "action": action,
-                "room": room,
+                "rooms": rooms,
                 "outcome": "failed" if _is_error(answer) else "success",
                 "answer": answer,
                 "latency_ms": latency_ms,
