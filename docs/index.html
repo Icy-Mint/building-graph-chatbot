@@ -244,6 +244,19 @@
       and all 107&times;3 answers were re-graded from the saved transcripts &mdash; no new model calls, same
       underlying data. Final score: <b>91/107</b>. The corrected categories are called out below rather than
       silently folded in.</div>
+
+    <div class="callout"><b>Two model quirks noticed along the way, not architecture findings:</b>
+      first, claude-sonnet-5 prepended a stray, literal <span class="mono">cypher</span> word on its own
+      line before the actual query in <b>57 of 129</b> raw Cypher-generation calls checked across both
+      runs (~44%) &mdash; despite the prompt explicitly saying "no prefixes, no code fences." Verified
+      harmless: the chain stores the <em>cleaned</em> query internally before execution (checked
+      <span class="mono">intermediate_steps</span> directly), so it never caused a wrong answer here, but
+      it would matter for any Cypher-execution path without that cleanup. Second, chatbot_nl2cypher.py's
+      <span class="mono">occupancy_forecast</span> score (2/8, in the table below) isn't only the "no
+      decline path" finding this page leads with &mdash; some of those misses are a genuine capability
+      limit: correctly writing a multi-level time-aggregation query (group by hour-of-day, average, across
+      a date range) in one shot is harder for the model than a direct lookup, a separate problem from
+      whether it can say "I don't know."</div>
   </section>
 
   <section id="results">
