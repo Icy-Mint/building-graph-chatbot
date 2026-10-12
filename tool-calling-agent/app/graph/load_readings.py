@@ -1,5 +1,5 @@
 """Loads sensor_readings from TimescaleDB into Neo4j as Reading nodes,
-duplicating what's already in TimescaleDB so chatbotForecast.py's existing
+duplicating what's already in TimescaleDB so chatbot_nl2cypher.py's existing
 NL-to-Cypher design (which expects sensor data to live in Neo4j as graph
 nodes) works unmodified against this database. TimescaleDB remains the
 source of truth -- this script only ever reads from it via the read-only

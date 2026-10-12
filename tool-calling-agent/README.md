@@ -1,4 +1,4 @@
-# dorm-agent
+# tool-calling-agent
 
 A dormitory building chat agent: Claude (Anthropic tool use) answers
 questions about the building by calling fixed, typed tools against a Neo4j
@@ -6,7 +6,7 @@ graph (building structure) and TimescaleDB (sensor time series). The model
 never writes raw Cypher or SQL.
 
 This is a separate subproject from the Streamlit bots one level up
-(`chatbot.py`, `chatbotForecast.py`) — different stack (FastAPI, Postgres,
+(`chatbot_classifier.py`, `chatbot_nl2cypher.py`) — different stack (FastAPI, Postgres,
 Docker Compose, Claude tool-use agent vs. single-file Streamlit apps),
 different dependencies, its own venv.
 
@@ -115,7 +115,7 @@ runs) has no per-role access control, so `app/graph/client.py` enforces
 read-only at the application layer instead (`run_read_only()` rejects any
 `CREATE`/`MERGE`/`DELETE`/`SET`/`REMOVE`/`DROP` before it reaches the
 driver — verified live with an actual `DETACH DELETE` attempt). This is
-lower-risk here than the same pattern was for `chatbotForecast.py`: every
+lower-risk here than the same pattern was for `chatbot_nl2cypher.py`: every
 query the tool layer runs is hand-written and fixed, never LLM-generated,
 so this is defense in depth, not the primary safeguard.
 
@@ -193,7 +193,7 @@ key became available, live against the real API.
    doing so, and explicitly said it had hit the iteration cap — the first
    live, real-world confirmation of nearly the entire Step 4 design working
    together end-to-end (also a notable cost/latency data point for the
-   eventual comparison: 5 tool calls for something `chatbotForecast.py`
+   eventual comparison: 5 tool calls for something `chatbot_nl2cypher.py`
    answers in one query).
 
 ## Running Steps 1–4
@@ -224,16 +224,16 @@ python -c "from app.agent.loop import ask; print(ask('Which rooms does AC1 servi
 ## Shared local database (optional)
 
 This Neo4j database can be used as a local, self-hosted alternative to the
-`chatbot.py`/`chatbotForecast.py` Streamlit bots' Neo4j Aura instance one
+`chatbot_classifier.py`/`chatbot_nl2cypher.py` Streamlit bots' Neo4j Aura instance one
 level up -- same schema (`Room.room_number`, `AC_Unit.ac_id`, `Sensor
 {sensor_id, sensor_type}`, `Reading` nodes), same AC-unit id format (`AC1`/
 `AC2`, no hyphen). Point those two files' `NEO4J_URI`/`NEO4J_USERNAME`/
 `NEO4J_PASSWORD` at this instance instead of Aura and they work unmodified
--- `chatbotForecast.py` in particular needs no prompt or schema-description
+-- `chatbot_nl2cypher.py` in particular needs no prompt or schema-description
 changes at all, since its existing few-shot examples already describe this
 exact naming. `app/graph/load_readings.py` is what makes that possible:
 TimescaleDB stays the source of truth for sensor data, and this script
-duplicates it into Neo4j as `Reading` nodes purely so `chatbotForecast.py`'s
+duplicates it into Neo4j as `Reading` nodes purely so `chatbot_nl2cypher.py`'s
 single-Cypher-query design (which expects sensor data to live in Neo4j) has
 something to query. Re-run it after `generate.py` if you regenerate with a
 different seed/date range -- it always clears and reloads, never appends.

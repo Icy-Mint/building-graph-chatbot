@@ -1,4 +1,4 @@
-"""Unit tests for chatbot.py's ask() dispatch logic, plus require_env_vars.
+"""Unit tests for chatbot_classifier.py's ask() dispatch logic, plus require_env_vars.
 
 These run entirely offline: chains/helpers are fakes with scripted return
 values, so no live Neo4j instance and no OpenAI key are needed.
@@ -6,7 +6,7 @@ values, so no live Neo4j instance and no OpenAI key are needed.
 import pandas as pd
 import pytest
 
-from chatbot import ask, require_env_vars, parser, SensorHelper, _pivot_readings_to_tables
+from chatbot_classifier import ask, require_env_vars, parser, SensorHelper, _pivot_readings_to_tables
 
 
 class FakeChain:
@@ -114,7 +114,7 @@ def test_no_room_returns_all_rooms():
 
 
 def test_multiple_rooms_reports_only_those_rooms_not_all_rooms():
-    """The fix for chatbot.py's single-room limit: "compare 101 and 102"
+    """The fix for chatbot_classifier.py's single-room limit: "compare 101 and 102"
     should answer about exactly those two, not fall back to every room."""
     chain = FakeChain([classify("current_temp", ["101", "102"])])
     sensor_helper = make_sensor_helper()
@@ -399,7 +399,7 @@ def test_require_env_vars_passes_when_all_set(monkeypatch):
     monkeypatch.setenv("NEO4J_USERNAME", "neo4j")
     monkeypatch.setenv("NEO4J_PASSWORD", "pw")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    import chatbot
+    import chatbot_classifier as chatbot
     monkeypatch.setattr(chatbot, "LLM_PROVIDER", "openai")
 
     require_env_vars()  # should not raise
@@ -408,7 +408,7 @@ def test_require_env_vars_passes_when_all_set(monkeypatch):
 def test_require_env_vars_lists_every_missing_var(monkeypatch):
     for name in ["NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD", "OPENAI_API_KEY"]:
         monkeypatch.delenv(name, raising=False)
-    import chatbot
+    import chatbot_classifier as chatbot
     monkeypatch.setattr(chatbot, "LLM_PROVIDER", "openai")
 
     with pytest.raises(RuntimeError) as exc_info:
@@ -424,7 +424,7 @@ def test_require_env_vars_checks_the_active_providers_key(monkeypatch):
     monkeypatch.setenv("NEO4J_USERNAME", "neo4j")
     monkeypatch.setenv("NEO4J_PASSWORD", "pw")
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    import chatbot
+    import chatbot_classifier as chatbot
     monkeypatch.setattr(chatbot, "LLM_PROVIDER", "gemini")
 
     with pytest.raises(RuntimeError) as exc_info:

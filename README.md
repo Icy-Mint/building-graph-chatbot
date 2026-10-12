@@ -13,8 +13,8 @@ This repo shows how to combine **Neo4j**, **LangChain + OpenAI**, and **Stre
 ├── lib/                     # (reserved for reusable modules)
 ├── sensor_outputs/          # Synthetic CSVs with room‑level sensor data
 │   └── room_101_timeseries.csv
-├── chatbot.py               # v1 – intent‑classifier chatbot
-├── chatbotForecast.py       # v2 – GraphCypherQAChain Streamlit app (main demo)
+├── chatbot_classifier.py    # v1 – fixed-intent-classifier chatbot
+├── chatbot_nl2cypher.py     # v2 – GraphCypherQAChain Streamlit app (main demo)
 ├── Graph.cypher             # Schema + seed data for Neo4j
 ├── Visualize.cypher         # Read-only queries to view the loaded graph
 ├── SensorDataGeneration.py  # Script to create synthetic sensor CSVs
@@ -110,7 +110,7 @@ run the queries in [`Visualize.cypher`](./Visualize.cypher).
 ```bash
 pip install -r requirements.txt && \
 cp .env.template .env && \
-streamlit run chatbotForecast.py
+streamlit run chatbot_nl2cypher.py
 ```
 
 Open the browser tab ➜ ask things like:
@@ -129,7 +129,7 @@ RETURN a.ac_id AS ac_unit,
 ORDER  BY ac_unit;
 ```
 
-### 📂 Short Description for Chatbot.py
+### 📂 Short Description for chatbot_classifier.py
 
 This Streamlit-based chatbot answers building management questions using an LLM classifier (via LangChain) to extract intent (hottest, coldest, occupancy, ac_mapping, fallback) and room number. SensorHelper and GraphHelper handle CSV sensor data and Neo4j queries. The system routes questions to helper functions based on LLM-classified intent, with fallback to LLM for open-ended queries.
 
@@ -149,7 +149,7 @@ This Streamlit-based chatbot answers building management questions using an LLM 
 * More complex as functions scale.
 * No conversation memory or context.
 
-### 📂 Short Description for chatbotForecast.py
+### 📂 Short Description for chatbot_nl2cypher.py
 
 A single‑page **Streamlit** app that converts plain‑English questions about rooms, AC‑units, temperatures, and occupancy into live **Cypher** queries on Neo4j.  
 For “forecast‑style” prompts it adds a minimal occupancy‑prediction workflow.

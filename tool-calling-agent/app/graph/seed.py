@@ -3,7 +3,7 @@ MERGE, so re-running this is safe and produces no duplicates -- the
 uniqueness constraints below also make that a hard guarantee, not just a
 convention.
 
-Schema matches chatbot.py/chatbotForecast.py's existing Aura schema (see
+Schema matches chatbot_classifier.py/chatbot_nl2cypher.py's existing Aura schema (see
 app/model.py's docstring) so this database can be used as a drop-in local
 alternative to Aura for those two files.
 

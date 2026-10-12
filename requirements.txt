@@ -11,7 +11,7 @@ pandas
 pytest
 
 # Optional: only needed if SENSOR_BACKEND=timescaledb in .env (points
-# chatbot.py at dorm-agent's local TimescaleDB instead of the sensor_outputs
+# chatbot_classifier.py at tool-calling-agent's local TimescaleDB instead of the sensor_outputs
 # CSVs). Default SENSOR_BACKEND=csv doesn't need this.
 psycopg[binary]>=3.1,<4.0
 

@@ -1,3 +1,11 @@
+# Deliberately kept as "dorm-agent" (this project's old name) even after
+# the folder was renamed to tool-calling-agent/ -- Docker Compose otherwise
+# derives the project name from the directory name, and a changed project
+# name would make the already-seeded containers/volumes below look like a
+# brand new, empty project. Don't "fix" this name to match the folder
+# without first migrating the existing neo4j_data/timescale_data volumes.
+name: dorm-agent
+
 services:
   neo4j:
     image: neo4j:5-community
@@ -8,11 +16,11 @@ services:
     environment:
       NEO4J_AUTH: ${NEO4J_USERNAME}/${NEO4J_PASSWORD}
       # Aura has APOC available by default; this image doesn't unless asked.
-      # chatbotForecast.py's Neo4jGraph wrapper calls apoc.meta.data() during
+      # chatbot_nl2cypher.py's Neo4jGraph wrapper calls apoc.meta.data() during
       # schema introspection (used by GraphCypherQAChain's validate_cypher
       # relationship-direction check) and fails outright without this --
       # needed only because that file now also targets this database, not
-      # by anything dorm-agent's own code uses.
+      # by anything this tool-calling-agent project's own code uses.
       NEO4J_PLUGINS: '["apoc"]'
     volumes:
       - neo4j_data:/data

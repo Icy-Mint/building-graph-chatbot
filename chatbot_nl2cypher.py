@@ -1,4 +1,4 @@
-# chatbotForecast.py
+# chatbot_nl2cypher.py
 """Streamlit chatbot that answers building-sensor questions by generating and
 executing Cypher against a Neo4j graph (GraphCypherQAChain), with a hardcoded
 fallback path for forecast-style questions."""
@@ -206,7 +206,7 @@ def _build_llm():
         # model" -- confirmed live), unlike the other three providers.
         # ChatAnthropic defaults to max_tokens=1024 and omits `thinking`
         # entirely, which lets the model default to extended thinking --
-        # confirmed live (in dorm-agent, same model) that thinking alone can
+        # confirmed live (in tool-calling-agent, same model) that thinking alone can
         # consume the whole 1024-token budget before any real output, making
         # responses silently empty. Disabled explicitly; this chain's two
         # calls (Cypher generation, then answer formatting) don't need deep
@@ -349,7 +349,7 @@ def log_interaction(entry: dict) -> None:
 
 # ─────────────────────────────────────────
 # 5.  STREAMLIT UI
-# Only runs under `streamlit run chatbotForecast.py` — importing this module
+# Only runs under `streamlit run chatbot_nl2cypher.py` — importing this module
 # (e.g. from a test) no longer builds a chain or opens a Neo4j connection.
 # ─────────────────────────────────────────
 def main():

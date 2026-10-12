@@ -1,0 +1,419 @@
+{
+  "questions": [
+    {
+      "id": "current_hottest",
+      "category": "current_hottest",
+      "question": "Which room is currently the hottest?",
+      "gt": {
+        "room": "102",
+        "value": 20.88,
+        "ts": "2024-01-14T23:55:00+00:00"
+      }
+    },
+    {
+      "id": "current_coldest",
+      "category": "current_coldest",
+      "question": "Which room is currently the coldest?",
+      "gt": {
+        "room": "106",
+        "value": 17.29,
+        "ts": "2024-01-14T23:55:00+00:00"
+      }
+    },
+    {
+      "id": "current_temp_103",
+      "category": "current_temp",
+      "question": "What is the temperature in room 103 right now?",
+      "gt": {
+        "room": "103",
+        "value": 17.35,
+        "ts": "2024-01-14T23:55:00+00:00"
+      }
+    },
+    {
+      "id": "alltime_hottest",
+      "category": "alltime_hottest",
+      "question": "What is the highest temperature ever recorded, and in which room?",
+      "gt": {
+        "room": "104",
+        "value": 29.62,
+        "ts": "2024-01-06T14:55:00+00:00"
+      }
+    },
+    {
+      "id": "alltime_coldest",
+      "category": "alltime_coldest",
+      "question": "What is the lowest temperature ever recorded, and in which room?",
+      "gt": {
+        "room": "106",
+        "value": 15.13,
+        "ts": "2024-01-07T02:30:00+00:00"
+      }
+    },
+    {
+      "id": "compare_101_104",
+      "category": "current_temp_multiroom",
+      "question": "Compare the current temperatures of room 101 and room 104.",
+      "gt": {
+        "101": {
+          "room": "101",
+          "value": 20.67,
+          "ts": "2024-01-14T23:55:00+00:00"
+        },
+        "104": {
+          "room": "104",
+          "value": 20.29,
+          "ts": "2024-01-14T23:55:00+00:00"
+        }
+      }
+    },
+    {
+      "id": "current_occupancy_102",
+      "category": "current_occupancy",
+      "question": "Is room 102 currently occupied?",
+      "gt": {
+        "room": "102",
+        "value": 1.0,
+        "ts": "2024-01-14T23:55:00+00:00"
+      }
+    },
+    {
+      "id": "occupancy_forecast_105",
+      "category": "occupancy_forecast",
+      "question": "Based on historical patterns, what's the probability room 105 will be occupied in the next hour?",
+      "gt": {
+        "room": "105",
+        "hour": 4,
+        "prob": 0.91,
+        "n": 168
+      }
+    },
+    {
+      "id": "ac_for_106",
+      "category": "ac_mapping",
+      "question": "Which AC unit services room 106?",
+      "gt": "AC2"
+    },
+    {
+      "id": "rooms_for_ac1",
+      "category": "ac_mapping",
+      "question": "Which rooms does AC1 service?",
+      "gt": [
+        "101",
+        "102",
+        "103"
+      ]
+    },
+    {
+      "id": "fallback_weather",
+      "category": "fallback",
+      "question": "What's the weather like outside today?",
+      "gt": null
+    }
+  ],
+  "results": {
+    "chatbot.py": [
+      {
+        "id": "current_hottest",
+        "answer": "Room 102 is currently the hottest at 20.9 \u00b0C (as of 2024-01-14 23:55).",
+        "input_tokens": 633,
+        "output_tokens": 30,
+        "latency_ms": 1279,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "current_coldest",
+        "answer": "Room 106 is currently the coldest at 17.3 \u00b0C (as of 2024-01-14 23:55).",
+        "input_tokens": 633,
+        "output_tokens": 30,
+        "latency_ms": 1059,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "current_temp_103",
+        "answer": "The current temperature in room 103 is 17.3 \u00b0C as of 2024-01-14 23:55.",
+        "input_tokens": 636,
+        "output_tokens": 33,
+        "latency_ms": 1001,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "alltime_hottest",
+        "answer": "Room 101 peaked at 29.2 \u00b0C on 2024-01-14 15:35\nRoom 102 peaked at 29.3 \u00b0C on 2024-01-13 15:10\nRoom 103 peaked at 24.9 \u00b0C on 2024-01-13 14:55\nRoom 104 peaked at 29.6 \u00b0C on 2024-01-06 14:55\nRoom 105 peaked at 24.8 \u00b0C on 2024-01-05 13:55\nRoom 106 peaked at 24.7 \u00b0C on 2024-01-05 13:30",
+        "input_tokens": 641,
+        "output_tokens": 32,
+        "latency_ms": 933,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "alltime_coldest",
+        "answer": "Room 101 reached lowest temperature 16.4 \u00b0C on 2024-01-14 04:20\nRoom 102 reached lowest temperature 16.7 \u00b0C on 2024-01-02 04:45\nRoom 103 reached lowest temperature 15.2 \u00b0C on 2024-01-08 02:40\nRoom 104 reached lowest temperature 16.4 \u00b0C on 2024-01-02 04:45\nRoom 105 reached lowest temperature 15.1 \u00b0C on 2024-01-11 02:25\nRoom 106 reached lowest temperature 15.1 \u00b0C on 2024-01-07 02:30",
+        "input_tokens": 642,
+        "output_tokens": 32,
+        "latency_ms": 830,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "compare_101_104",
+        "answer": "The current temperature in room 101 is 20.7 \u00b0C as of 2024-01-14 23:55.\nThe current temperature in room 104 is 20.3 \u00b0C as of 2024-01-14 23:55.",
+        "input_tokens": 641,
+        "output_tokens": 36,
+        "latency_ms": 790,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "current_occupancy_102",
+        "answer": "Room 102 is currently occupied (as of 2024-01-14 23:55).",
+        "input_tokens": 634,
+        "output_tokens": 35,
+        "latency_ms": 936,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "occupancy_forecast_105",
+        "answer": "Room 105 has a 91% historical probability of being occupied around 4:00 (the next hour), based on 168 past readings at that hour.",
+        "input_tokens": 651,
+        "output_tokens": 37,
+        "latency_ms": 859,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "ac_for_106",
+        "answer": "AC unit AC1 serves rooms: 101, 102, 103.\nAC unit AC2 serves rooms: 104, 105, 106.",
+        "input_tokens": 633,
+        "output_tokens": 35,
+        "latency_ms": 969,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "rooms_for_ac1",
+        "answer": "AC unit AC1 serves rooms: 101, 102, 103.\nAC unit AC2 serves rooms: 104, 105, 106.",
+        "input_tokens": 634,
+        "output_tokens": 31,
+        "latency_ms": 917,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "fallback_weather",
+        "answer": "I don't have access to real-time weather data or current outdoor conditions. As a building management assistant, my capabilities are focused on:\n\n- Building layout information\n- Indoor sensor data (temperature, humidity, occupancy, air quality, etc.)\n- HVAC and equipment status\n- Energy usage\n- Other building systems and facility management topics\n\nTo get accurate weather information, I'd recommend:\n- Checking a weather app or website (like Weather.com, your phone's built-in weather app)\n- Asking a voice assistant with internet access (Siri, Google Assistant, Alexa)\n- Looking outside, if possible!\n\nThat said, if your building has outdoor sensors (e.g., a weather station, outdoor temperature/humidity sensors tied into the BMS), I'd be happy to help interpret that data if you can share it with me.\n\nIs there something about the building's indoor environment or systems I can help you with instead?",
+        "input_tokens": 681,
+        "output_tokens": 324,
+        "latency_ms": 4286,
+        "error": null,
+        "correct": true
+      }
+    ],
+    "chatbotForecast.py": [
+      {
+        "id": "current_hottest",
+        "answer": "Room 102 is currently the hottest, with a temperature of approximately 20.88\u00b0C.",
+        "input_tokens": 1309,
+        "output_tokens": 152,
+        "latency_ms": 2439,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "current_coldest",
+        "answer": "Room 106 is currently the coldest, with a temperature of 17.29\u00b0C.",
+        "input_tokens": 1309,
+        "output_tokens": 159,
+        "latency_ms": 2709,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "current_temp_103",
+        "answer": "The temperature in room 103 is 17.35\u00b0C as of January 14, 2024, 23:55 UTC.",
+        "input_tokens": 1312,
+        "output_tokens": 131,
+        "latency_ms": 2908,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "alltime_hottest",
+        "answer": "Room 104 recorded a temperature of 29.62\u00b0C as of 2024-01-06 14:55:00 UTC.",
+        "input_tokens": 1317,
+        "output_tokens": 129,
+        "latency_ms": 2504,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "alltime_coldest",
+        "answer": "The lowest recorded temperature is 15.13\u00b0C, recorded in room 106 as of January 7, 2024, 02:30 AM UTC.",
+        "input_tokens": 1318,
+        "output_tokens": 129,
+        "latency_ms": 2710,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "compare_101_104",
+        "answer": "As of 2024-01-14 23:55 UTC, room 101 has a temperature of 20.67\u00b0C, while room 104 has a temperature of 20.29\u00b0C. Room 101 is slightly warmer than room 104, with a difference of about 0.38\u00b0C.",
+        "input_tokens": 1317,
+        "output_tokens": 169,
+        "latency_ms": 3294,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "current_occupancy_102",
+        "answer": "Yes, room 102 is currently occupied, as of 2024-01-14 23:55:00 UTC.",
+        "input_tokens": 1310,
+        "output_tokens": 132,
+        "latency_ms": 2806,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "occupancy_forecast_105",
+        "answer": "[ERROR: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'Cannot': expected 'FOREACH', 'ALTER', 'ORDER BY', 'CALL', 'USING PERIODIC COMMIT', 'CREATE', 'LOAD CSV', 'START DATABASE', 'STOP DATABASE', 'DEALLOCATE', 'DELETE', 'DENY', 'DETACH', 'DROP', 'DRYRUN', 'FINISH', 'GRANT', 'INSERT', 'LIMIT', 'MATCH', 'MERGE', 'NODETACH', 'OFFSET', 'OPTIONAL', 'REALLOCATE', 'REMOVE', 'RENAME', 'RETURN', 'REVOKE', 'ENABLE SERVER', 'SET', 'SHOW', 'SKIP', 'TERMINATE', 'UNWIND', 'USE' or 'WITH' (line 1, column 1 (offset: 0))\n\"Cannot answer with the current schema.\"\n ^} {gql_status: 50N42} {gql_status_description: error: general processing exception - unexpected error. Unexpected error has occurred. See debug log for details.}]",
+        "input_tokens": 3132,
+        "output_tokens": 28,
+        "latency_ms": 1485,
+        "error": "{neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'Cannot': expected 'FOREACH', 'ALTER', 'ORDER BY', 'CALL', 'USING PERIODIC COMMIT', 'CREATE', 'LOAD CSV', 'START DATABASE', 'STOP DATABASE', 'DEALLOCATE', 'DELETE', 'DENY', 'DETACH', 'DROP', 'DRYRUN', 'FINISH', 'GRANT', 'INSERT', 'LIMIT', 'MATCH', 'MERGE', 'NODETACH', 'OFFSET', 'OPTIONAL', 'REALLOCATE', 'REMOVE', 'RENAME', 'RETURN', 'REVOKE', 'ENABLE SERVER', 'SET', 'SHOW', 'SKIP', 'TERMINATE', 'UNWIND', 'USE' or 'WITH' (line 1, column 1 (offset: 0))\n\"Cannot answer with the current schema.\"\n ^} {gql_status: 50N42} {gql_status_description: error: general processing exception - unexpected error. Unexpected error has occurred. See debug log for details.}",
+        "correct": false
+      },
+      {
+        "id": "ac_for_106",
+        "answer": "AC2 services room 106.",
+        "input_tokens": 1309,
+        "output_tokens": 58,
+        "latency_ms": 1839,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "rooms_for_ac1",
+        "answer": "AC1 services rooms 103, 102, and 101.",
+        "input_tokens": 1310,
+        "output_tokens": 53,
+        "latency_ms": 1964,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "fallback_weather",
+        "answer": "[ERROR: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'Cannot': expected 'FOREACH', 'ALTER', 'ORDER BY', 'CALL', 'USING PERIODIC COMMIT', 'CREATE', 'LOAD CSV', 'START DATABASE', 'STOP DATABASE', 'DEALLOCATE', 'DELETE', 'DENY', 'DETACH', 'DROP', 'DRYRUN', 'FINISH', 'GRANT', 'INSERT', 'LIMIT', 'MATCH', 'MERGE', 'NODETACH', 'OFFSET', 'OPTIONAL', 'REALLOCATE', 'REMOVE', 'RENAME', 'RETURN', 'REVOKE', 'ENABLE SERVER', 'SET', 'SHOW', 'SKIP', 'TERMINATE', 'UNWIND', 'USE' or 'WITH' (line 1, column 1 (offset: 0))\n\"Cannot answer with the current schema.\"\n ^} {gql_status: 50N42} {gql_status_description: error: general processing exception - unexpected error. Unexpected error has occurred. See debug log for details.}]",
+        "input_tokens": 3094,
+        "output_tokens": 28,
+        "latency_ms": 1452,
+        "error": "{neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'Cannot': expected 'FOREACH', 'ALTER', 'ORDER BY', 'CALL', 'USING PERIODIC COMMIT', 'CREATE', 'LOAD CSV', 'START DATABASE', 'STOP DATABASE', 'DEALLOCATE', 'DELETE', 'DENY', 'DETACH', 'DROP', 'DRYRUN', 'FINISH', 'GRANT', 'INSERT', 'LIMIT', 'MATCH', 'MERGE', 'NODETACH', 'OFFSET', 'OPTIONAL', 'REALLOCATE', 'REMOVE', 'RENAME', 'RETURN', 'REVOKE', 'ENABLE SERVER', 'SET', 'SHOW', 'SKIP', 'TERMINATE', 'UNWIND', 'USE' or 'WITH' (line 1, column 1 (offset: 0))\n\"Cannot answer with the current schema.\"\n ^} {gql_status: 50N42} {gql_status_description: error: general processing exception - unexpected error. Unexpected error has occurred. See debug log for details.}",
+        "correct": false
+      }
+    ],
+    "dorm-agent": [
+      {
+        "id": "current_hottest",
+        "answer": "**Answer: Room 102 is currently the hottest**, at **21.21\u00b0C** as of the most recent reading in the data (**2024-01-14 23:00 UTC**) \u2014 just barely ahead of 101 (21.17\u00b0C) and 104 (21.06\u00b0C).\n\nDetails so you can verify:\n- Queried rooms 101\u2013106, hourly aggregation, range 2024-01-13T00:00Z to 2024-01-14T23:59Z (the latest data available in the system \u2014 there's nothing beyond 2024-01-14).\n- Latest-hour snapshot (2024-01-14 23:00 UTC): 101=21.17\u00b0C, 102=21.21\u00b0C, 103=17.61\u00b0C, 104=21.06\u00b0C, 105=17.29\u00b0C, 106=17.13\u00b0C.\n- Room 102 is serviced by **AC1** (along with 101 and 103). Notably, 101 and 102 (both AC1) are the two closest contenders, while 103 \u2014 also on AC1 \u2014 is running much cooler, so this isn't simply an AC1-wide effect.\n- For context, 102 also had the day's single highest peak (~28.12\u00b0C at 16:00 UTC on 2024-01-14), narrowly topping 104 (AC2) and 101 (AC1), so the \"hottest room\" result is consistent whether you look at the latest instant or the most recent afternoon peak.\n\nNote: since the underlying sensor history stops at 2024-01-14, this \"current\" reading reflects that point in time, not real-time now.",
+        "input_tokens": 45576,
+        "output_tokens": 1488,
+        "latency_ms": 17885,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "current_coldest",
+        "answer": "**Room 106 is currently the coldest**, at approximately **17.13\u00b0C** as of the most recent reading available: **2024-01-14 23:00 UTC**.\n\nFor context, at that same hour the other rooms read:\n- 105: 17.29\u00b0C (also serviced by AC2)\n- 103: 17.61\u00b0C\n- 104: 21.06\u00b0C\n- 101: 21.17\u00b0C\n- 102: 21.21\u00b0C\n\nRoom 106 is serviced by **AC2**. Notably, 105 (also on AC2, likely) was the next-coldest at a very similar temperature, while 103, 104, 101, and 102 ran warmer \u2014 this suggests AC2's zone is running cooler overall compared to the AC1 zone at this hour.\n\nData source: `get_temp_readings` for rooms 101\u2013106, hourly aggregation, queried over 2024-01-13 to 2024-01-14 (the latest data available in the system \u2014 note the full dataset only spans 2024-01-01 through 2024-01-14, so this is the most \"current\" data on record, not live/real-time).",
+        "input_tokens": 45180,
+        "output_tokens": 1172,
+        "latency_ms": 16053,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "current_temp_103",
+        "answer": "The most recent temperature reading available for room 103 is **17.35\u00b0C at 2024-01-14T23:55:00 UTC** (the last 5-minute raw sample before the data ends).\n\nDetails for verification:\n- Queried room 103 temperature readings from 2024-01-01 through 2025-12-31 (hourly), found data tapering off after 2024-01-14; confirmed with a daily aggregate that 2024-01-14 is the last day with data, then pulled raw 5-minute samples for that day to get the exact latest timestamp.\n- Room 103 is serviced by **AC1**.\n\nNote: this is historical data \u2014 the last available reading is from January 14, 2024, so \"right now\" here means that timestamp, not a live current reading.",
+        "input_tokens": 85501,
+        "output_tokens": 1029,
+        "latency_ms": 12585,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "alltime_hottest",
+        "answer": "**Answer:** The highest temperature recorded was **~29.62\u00b0C in Room 104**, occurring during the 2 PM (hour 14) hourly bucket. Room 104 is serviced by **AC2**.\n\nDetails on how I derived this:\n- I queried `get_hot_periods` with threshold 20\u00b0C across all 6 dorm rooms (101\u2013106) over a very wide date range (2000-01-01 to 2030-01-01) to catch all available history.\n- This returns, per room and per hour-of-day, the max temperature ever seen in that hour bucket. Room 104's hour-14 bucket had the single highest max (29.615\u00b0C), narrowly edging out Room 101's hour-15 bucket (29.195\u00b0C) and Room 101's hour-17 (29.062\u00b0C).\n- Rooms 103, 105, and 106 topped out noticeably lower (mid-24\u00b0C range), suggesting they don't reach the same peak temperatures as 101/102/104.\n\nNote: this tool aggregates by hour-of-day across the whole range (not as individual timestamped events), so I can tell you the hour-of-day pattern and peak value, but not the exact calendar date/time that 29.62\u00b0C occurred. If you need the exact timestamp, I can pull raw or hourly readings for Room 104 in a narrower window to pinpoint it \u2014 let me know if you'd like that.",
+        "input_tokens": 7978,
+        "output_tokens": 880,
+        "latency_ms": 10975,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "alltime_coldest",
+        "answer": "I don't have a tool that directly finds an all-time minimum across all rooms in one call \u2014 `get_temp_readings` requires a date range and specific rooms, and `get_hot_periods` only finds values *above* a threshold, not below. \n\nTo give you an accurate answer, I'd need to know the date range of available historical data, and then pull temperature readings for all 6 dorm rooms (101-106) over that range to compare minimums. Mechanical rooms (201, 202) have no sensors, so they're excluded.\n\nCould you let me know:\n1. The date range you want me to check (or confirm you want the full history \u2014 if so, what's the earliest date data exists)?\n\nAlternatively, if you have a specific time window in mind (e.g., \"this past winter\"), tell me that and I'll pull hourly/daily readings for all 6 dorm rooms and identify the lowest recorded temperature and which room it occurred in.",
+        "input_tokens": 93,
+        "output_tokens": 291,
+        "latency_ms": 3644,
+        "error": null,
+        "correct": false
+      },
+      {
+        "id": "compare_101_104",
+        "answer": "Data was available (hourly averages) from 2024-01-01 through 2024-01-14, which is the most recent window I could retrieve for both rooms. The latest reading in this dataset is **2024-01-14T23:00:00Z**:\n\n| Room | AC Unit | Temp at 2024-01-14 23:00 UTC |\n|------|---------|-------------------------------|\n| 101  | AC1     | 21.17 \u00b0C |\n| 104  | AC2     | 21.06 \u00b0C |\n\n**Comparison:** The two rooms are essentially at the same temperature right now \u2014 only about 0.1 \u00b0C apart (101 slightly warmer). This is consistent across the whole two-week window I queried: both rooms show the same daily swing pattern, dipping to roughly 18 \u00b0C in the early morning (around 04:00\u201305:00 UTC) and peaking near 28 \u00b0C in the mid-afternoon (around 15:00\u201316:00 UTC).\n\nRoom 101 is serviced by **AC1** and room 104 is serviced by **AC2** \u2014 different AC units \u2014 yet their temperature curves track each other almost identically in both timing and magnitude throughout the period. This suggests both AC units are maintaining very similar setpoints/performance, or there's a shared external driver (e.g. building-wide solar/outdoor temperature influence) affecting both zones similarly, rather than one AC unit underperforming relative to the other.\n\nIf you'd like, I can pull more recent data (if available beyond Jan 14) or check `get_rooms_serviced_by_ac` to see what other rooms share AC1 vs AC2 for broader context.",
+        "input_tokens": 69515,
+        "output_tokens": 840,
+        "latency_ms": 11143,
+        "error": null,
+        "correct": false
+      },
+      {
+        "id": "current_occupancy_102",
+        "answer": "That confirms no data exists beyond mid-January 2024. The most recent reading we have is from **2024-01-14T23:00:00Z**, where the hourly occupancy rate was **0.75** (75% of that hour occupied).\n\n**Answer:** Based on the most recent available data, room 102 was occupied during the last recorded hour (2024-01-14, 23:00 UTC) with an occupancy rate of 0.75 \u2014 meaning it was occupied roughly 75% of that hour. I don't have any data beyond that timestamp, so I can't confirm occupancy at a truly \"current\" moment beyond this historical window.\n\nFor context: room 102 is a dorm room serviced by **AC1** (confirmed via `get_room_info`). \n\nIf you want, I can also run a forecast (`forecast_occupancy`) to estimate the probability of occupancy going forward from that last known point, since true \"live\" data isn't available.",
+        "input_tokens": 35208,
+        "output_tokens": 745,
+        "latency_ms": 10613,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "occupancy_forecast_105",
+        "answer": "Based on historical day-of-week and hour-of-day patterns for room 105 (using ~1.86 weeks of historical data), the forecasted probability that room 105 will be occupied in the next hour (as of the forecast timestamp **2024-01-15T00:55:00 UTC**) is approximately **91.7%**.\n\nThis was generated via the `forecast_occupancy` tool for room 105 with a 1-hour horizon \u2014 let me know if you'd like me to pull the underlying occupancy history for 105 to sanity-check this pattern.",
+        "input_tokens": 400,
+        "output_tokens": 278,
+        "latency_ms": 3667,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "ac_for_106",
+        "answer": "Room 106 is serviced by **AC2**.",
+        "input_tokens": 255,
+        "output_tokens": 72,
+        "latency_ms": 1888,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "rooms_for_ac1",
+        "answer": "AC1 services three dorm rooms: **101, 102, and 103**.",
+        "input_tokens": 328,
+        "output_tokens": 89,
+        "latency_ms": 1894,
+        "error": null,
+        "correct": true
+      },
+      {
+        "id": "fallback_weather",
+        "answer": "I don't have access to weather data or any external/live data sources \u2014 my tools are limited to the dormitory's building systems (temperature sensors, occupancy sensors, and AC unit relationships) stored in the building's internal graph and time-series databases. I have no way to tell you what the weather is like outside today.\n\nIf you're asking because you're curious whether outdoor conditions might be affecting indoor dorm temperatures, I'd be happy to help investigate that angle instead \u2014 for example, I could pull recent temperature readings for specific rooms, check which AC units service them, or look at occupancy patterns. Just let me know which rooms or time range you're interested in.",
+        "input_tokens": 83,
+        "output_tokens": 207,
+        "latency_ms": 2960,
+        "error": null,
+        "correct": true
+      }
+    ]
+  }
+}

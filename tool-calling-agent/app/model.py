@@ -2,7 +2,7 @@
 validate.py, and the tool layer all import from here so none of them can
 silently drift apart.
 
-Graph shape (standardized to match chatbot.py/chatbotForecast.py's existing
+Graph shape (standardized to match chatbot_classifier.py/chatbot_nl2cypher.py's existing
 Aura schema, so the local Neo4j this project seeds can be used as a drop-in
 alternative to Aura for those two files -- no code changes on their side,
 just a connection string):
@@ -15,7 +15,7 @@ just a connection string):
 
 Mechanical rooms intentionally have no sensors. Reading nodes are a
 duplicate of TimescaleDB's sensor_readings table (see
-app/graph/load_readings.py) -- they exist only so chatbotForecast.py's
+app/graph/load_readings.py) -- they exist only so chatbot_nl2cypher.py's
 existing NL-to-Cypher design, which expects sensor data to live in Neo4j,
 keeps working unmodified against this database. TimescaleDB remains the
 source of truth; Reading nodes are loaded from it, never the reverse.

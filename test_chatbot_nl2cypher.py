@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-from chatbotForecast import ask_graph, require_env_vars, ensure_read_only_cypher, _PROVIDER_API_KEY_ENV
+from chatbot_nl2cypher import ask_graph, require_env_vars, ensure_read_only_cypher, _PROVIDER_API_KEY_ENV
 
 
 class FakeChain:
@@ -190,8 +190,8 @@ def test_require_env_vars_passes_when_all_set(monkeypatch):
     monkeypatch.setenv("NEO4J_USERNAME", "neo4j")
     monkeypatch.setenv("NEO4J_PASSWORD", "pw")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    import chatbotForecast
-    monkeypatch.setattr(chatbotForecast, "LLM_PROVIDER", "openai")
+    import chatbot_nl2cypher
+    monkeypatch.setattr(chatbot_nl2cypher, "LLM_PROVIDER", "openai")
 
     require_env_vars()  # should not raise
 
@@ -199,8 +199,8 @@ def test_require_env_vars_passes_when_all_set(monkeypatch):
 def test_require_env_vars_lists_every_missing_var(monkeypatch):
     for name in ["NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD", "OPENAI_API_KEY"]:
         monkeypatch.delenv(name, raising=False)
-    import chatbotForecast
-    monkeypatch.setattr(chatbotForecast, "LLM_PROVIDER", "openai")
+    import chatbot_nl2cypher
+    monkeypatch.setattr(chatbot_nl2cypher, "LLM_PROVIDER", "openai")
 
     with pytest.raises(RuntimeError) as exc_info:
         require_env_vars()
@@ -215,8 +215,8 @@ def test_require_env_vars_checks_the_active_providers_key(monkeypatch):
     monkeypatch.setenv("NEO4J_USERNAME", "neo4j")
     monkeypatch.setenv("NEO4J_PASSWORD", "pw")
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    import chatbotForecast
-    monkeypatch.setattr(chatbotForecast, "LLM_PROVIDER", "gemini")
+    import chatbot_nl2cypher
+    monkeypatch.setattr(chatbot_nl2cypher, "LLM_PROVIDER", "gemini")
 
     with pytest.raises(RuntimeError) as exc_info:
         require_env_vars()

@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A controlled, 107-question comparison of three LLM chatbot architectures over the same knowledge graph and sensor database -- fixed intent classification, text-to-Cypher, and a typed-tool agent -- graded against independently computed ground truth.">
+<title>Three Architectures, One Dorm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* layout concept: vertical case-study scroll -- hero stat strip, then
+     background/why, methodology, results (summary cards + category
+     evidence table + quoted failure modes), decision-guide takeaways,
+     footer with limitations. three accent hues tag the three systems
+     consistently everywhere (chart bars, pills, quote borders). */
+  :root{
+    --bg:#F1F3F2; --panel:#FFFFFF; --panel-2:#E9EDEC;
+    --fg:#15181A; --fg-muted:#565F62; --border:#D7DEDC;
+    --accent:#1C6E7A;
+    --ok:#1E7D4A; --warn:#B9790A; --bad:#B8402E;
+    --sys-cb:#B9790A; --sys-cf:#1C8C7A; --sys-da:#6E4C9C;
+    --sys-cb-bg:#B9790A1A; --sys-cf-bg:#1C8C7A1A; --sys-da-bg:#6E4C9C1A;
+    --font-display:'Fraunces', Georgia, serif;
+    --font-body:'Public Sans', -apple-system, Segoe UI, sans-serif;
+    --font-mono:'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#121516; --panel:#191D1F; --panel-2:#1F2426;
+      --fg:#EBEEEC; --fg-muted:#9FA8A5; --border:#2B3133;
+      --accent:#5FC2CE;
+      --ok:#4FBE7E; --warn:#E0A53C; --bad:#E27A68;
+      --sys-cb:#E0A53C; --sys-cf:#4FD0BC; --sys-da:#A98BDC;
+      --sys-cb-bg:#E0A53C26; --sys-cf-bg:#4FD0BC26; --sys-da-bg:#A98BDC26;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#121516; --panel:#191D1F; --panel-2:#1F2426;
+    --fg:#EBEEEC; --fg-muted:#9FA8A5; --border:#2B3133;
+    --accent:#5FC2CE;
+    --ok:#4FBE7E; --warn:#E0A53C; --bad:#E27A68;
+    --sys-cb:#E0A53C; --sys-cf:#4FD0BC; --sys-da:#A98BDC;
+    --sys-cb-bg:#E0A53C26; --sys-cf-bg:#4FD0BC26; --sys-da-bg:#A98BDC26;
+    color-scheme: dark;
+  }
+
+  body{ background:var(--bg); color:var(--fg); font-family:var(--font-body);
+        padding-inline:20px; padding-block:0; }
+  *{ box-sizing:border-box; }
+  .wrap{ max-width:920px; margin:0 auto; }
+  h1,h2,h3{ font-family:var(--font-display); font-weight:600; text-wrap:balance; margin:0; }
+  p{ line-height:1.6; color:var(--fg); max-width:65ch; }
+  .muted{ color:var(--fg-muted); }
+  .mono{ font-family:var(--font-mono); }
+  a{ color:var(--accent); }
+
+  /* ---------- hero ---------- */
+  .hero{ padding-block:64px 36px; }
+  .eyebrow{ font-family:var(--font-mono); font-size:12px; letter-spacing:.09em; text-transform:uppercase;
+            color:var(--accent); margin-bottom:14px; }
+  h1.title{ font-size:clamp(32px,6vw,52px); line-height:1.05; margin-bottom:16px; }
+  .dek{ font-size:17px; color:var(--fg-muted); max-width:62ch; margin-bottom:28px; }
+  .stat-strip{ display:flex; flex-wrap:wrap; gap:10px; }
+  .stat-chip{ font-family:var(--font-mono); font-size:13px; background:var(--panel);
+              border:1px solid var(--border); border-radius:8px; padding:8px 12px;
+              display:flex; gap:6px; align-items:baseline; }
+  .stat-chip b{ font-family:var(--font-display); font-size:16px; }
+
+  /* ---------- sections ---------- */
+  section{ padding-block:40px; border-top:1px solid var(--border); }
+  .section-head{ display:flex; align-items:baseline; gap:12px; margin-bottom:22px; }
+  .section-num{ font-family:var(--font-mono); color:var(--fg-muted); font-size:13px; }
+  h2.section-title{ font-size:26px; }
+
+  /* ---------- three-architecture cards ---------- */
+  .arch-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-block:24px; min-width:0; }
+  @media (max-width:700px){ .arch-row{ grid-template-columns:1fr; } }
+  .arch-card{ background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:18px;
+              border-top:3px solid var(--c); min-width:0; }
+  .arch-card .name{ font-family:var(--font-mono); font-size:13px; font-weight:600; color:var(--c); margin-bottom:6px; }
+  .arch-card .how{ font-size:14px; color:var(--fg-muted); line-height:1.5; }
+
+  /* ---------- fact grid (methodology) ---------- */
+  .fact-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-block:20px; }
+  @media (max-width:600px){ .fact-grid{ grid-template-columns:1fr; } }
+  .fact{ background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px 16px; min-width:0; }
+  .fact .k{ font-size:12px; color:var(--fg-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
+  .fact .v{ font-family:var(--font-mono); font-size:14px; }
+
+  .callout{ background:var(--panel-2); border:1px solid var(--border); border-radius:10px;
+            padding:16px 18px; margin-block:18px; font-size:14px; line-height:1.6; }
+  .callout b{ color:var(--accent); }
+
+  /* ---------- summary cards with bars ---------- */
+  .summary-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-block:22px; }
+  @media (max-width:700px){ .summary-grid{ grid-template-columns:1fr; } }
+  .sys-card{ background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; min-width:0; }
+  .sys-card .tag{ display:inline-block; font-family:var(--font-mono); font-size:12px; font-weight:600;
+                  padding:3px 8px; border-radius:6px; margin-bottom:12px; }
+  .sys-card .big{ font-family:var(--font-display); font-size:30px; font-variant-numeric:tabular-nums; }
+  .metric-row{ margin-block:12px 4px; }
+  .metric-label{ display:flex; justify-content:space-between; font-size:12px; color:var(--fg-muted); margin-bottom:5px; }
+  .metric-label span.v{ font-family:var(--font-mono); color:var(--fg); }
+  .bar-track{ height:8px; background:var(--panel-2); border-radius:5px; overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:5px; }
+
+  /* ---------- category evidence table ---------- */
+  .table-scroll{ overflow-x:auto; margin-block:20px; border:1px solid var(--border); border-radius:12px; }
+  table.cat{ width:100%; border-collapse:collapse; font-size:13px; min-width:560px; }
+  table.cat th, table.cat td{ padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); }
+  table.cat thead th{ font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.04em;
+                       color:var(--fg-muted); background:var(--panel-2); position:sticky; top:0; }
+  table.cat tbody tr:last-child td{ border-bottom:none; }
+  table.cat td.cell{ font-family:var(--font-mono); text-align:center; font-weight:600; border-radius:6px; }
+  .cell-full{ color:var(--ok); }
+  .cell-partial{ color:var(--warn); }
+  .cell-zero{ color:var(--bad); }
+  td.catname{ color:var(--fg); max-width:230px; }
+  td.catname .id{ display:block; font-family:var(--font-mono); font-size:11px; color:var(--fg-muted); }
+
+  /* ---------- quote cards ---------- */
+  .quote-grid{ display:grid; gap:14px; margin-block:20px; }
+  .quote-card{ background:var(--panel); border:1px solid var(--border); border-left:4px solid var(--c);
+               border-radius:10px; padding:16px 18px; min-width:0; }
+  .quote-card .who{ font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--c); margin-bottom:8px; }
+  .quote-card .q{ font-size:13px; color:var(--fg-muted); margin-bottom:8px; }
+  .quote-card .a{ font-size:14px; font-style:italic; line-height:1.55; margin-bottom:8px; }
+  .quote-card .note{ font-size:12.5px; color:var(--fg-muted); border-top:1px dashed var(--border); padding-top:8px; }
+
+  /* ---------- decision table ---------- */
+  .decision{ display:grid; gap:12px; margin-block:20px; }
+  .decision-row{ display:grid; grid-template-columns:170px 1fr; gap:16px; background:var(--panel);
+                 border:1px solid var(--border); border-radius:10px; padding:14px 16px; align-items:start; }
+  @media (max-width:600px){ .decision-row{ grid-template-columns:1fr; } }
+  .decision-row .who{ font-family:var(--font-mono); font-size:13px; font-weight:600; }
+  .decision-row p{ font-size:14px; margin:0; max-width:none; }
+
+  footer{ padding-block:40px 70px; color:var(--fg-muted); font-size:13px; line-height:1.7; }
+  footer p{ max-width:none; color:var(--fg-muted); }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow">Case study &middot; agentic architecture benchmark</div>
+    <h1 class="title">Three architectures, one dorm</h1>
+    <p class="dek">Same questions. Same model. Same database. Three different ways of letting an LLM answer
+      questions about a building's sensors &mdash; a fixed intent classifier, a text-to-Cypher chain, and a
+      typed tool-calling agent &mdash; graded against ground truth computed directly from the database, not
+      from any of the systems being tested.</p>
+    <div class="stat-strip">
+      <div class="stat-chip"><b>107</b><span class="muted">questions</span></div>
+      <div class="stat-chip"><b>3</b><span class="muted">architectures</span></div>
+      <div class="stat-chip"><b>1</b><span class="muted">shared model &amp; database</span></div>
+      <div class="stat-chip"><b>17</b><span class="muted">question categories</span></div>
+    </div>
+  </div>
+
+  <section id="why">
+    <div class="section-head"><span class="section-num">01</span><h2 class="section-title">Why this comparison</h2></div>
+    <p>Any team that puts a chatbot in front of a database &mdash; a building's sensor graph, a product
+      catalog, a support ticket queue &mdash; ends up choosing between the same three shapes, usually on
+      instinct rather than evidence:</p>
+
+    <div class="arch-row">
+      <div class="arch-card" style="--c:var(--sys-cb)">
+        <div class="name">chatbot_classifier.py</div>
+        <div class="how">Classify the question into a fixed list of intents, then run hand-written Cypher or
+          pandas for that intent. Nothing is generated at query time.</div>
+      </div>
+      <div class="arch-card" style="--c:var(--sys-cf)">
+        <div class="name">chatbot_nl2cypher.py</div>
+        <div class="how">Let the model write the Cypher itself for every question (LangChain's
+          <span class="mono">GraphCypherQAChain</span>), validated against the schema before it runs.</div>
+      </div>
+      <div class="arch-card" style="--c:var(--sys-da)">
+        <div class="name">tool-calling-agent</div>
+        <div class="how">Give the model seven typed, pre-written tools and let it call them in a loop. It
+          never writes a query itself &mdash; only picks tools and arguments.</div>
+      </div>
+    </div>
+
+    <p>Each one is a real, reasonable choice, and each is usually defended with the same anecdotes: fixed
+      taxonomies are "fast and cheap but brittle," text-to-query is "flexible but unsafe," agents are
+      "robust but slow and expensive." Those claims are directionally true and almost never measured. This
+      project holds the model, the database, and the questions constant and measures what actually happens:
+      not just <em>how often</em> each one is right, but <em>how</em> each one is wrong &mdash; because the
+      failure shape turns out to matter more than the failure rate.</p>
+
+    <div class="callout">The building itself is synthetic but not arbitrary: a 2-floor dorm wing with 6
+      dorm rooms and 2 mechanical rooms, 2 AC units each serving 3 rooms, temperature + occupancy sensors on
+      a 5-minute cadence for 14 days &mdash; <b>48,384 readings</b> generated from a deterministic model
+      (sinusoidal temperature profiles, hour-of-day occupancy probabilities) so every ground-truth answer
+      below can be checked exactly, including against the generator that produced the data.</div>
+  </section>
+
+  <section id="method">
+    <div class="section-head"><span class="section-num">02</span><h2 class="section-title">Method</h2></div>
+    <p>All three systems ran against the <em>same</em> local Neo4j + TimescaleDB instance and the <em>same</em>
+      model (<span class="mono">claude-sonnet-5</span>, thinking disabled for predictable tool calls), so
+      differences in the results trace back to architecture, not to data or model drift. Ground truth for
+      every question was computed independently with raw SQL / Cypher against the database before any
+      system was asked anything.</p>
+
+    <div class="fact-grid">
+      <div class="fact"><div class="k">Model</div><div class="v">claude-sonnet-5, identical config</div></div>
+      <div class="fact"><div class="k">Database</div><div class="v">1 shared local Neo4j + TimescaleDB</div></div>
+      <div class="fact"><div class="k">Questions</div><div class="v">107, 17 categories, programmatically generated</div></div>
+      <div class="fact"><div class="k">Grading</div><div class="v">automated checks against independently-computed ground truth</div></div>
+    </div>
+
+    <p>The 17 categories span direct lookups (current/all-time temperature extremes, occupancy status,
+      AC-to-room mapping), harder shapes (multi-room comparisons, historical occupancy rate, next-hour
+      occupancy forecast), compound questions that need two facts joined in one answer, and 12 deliberately
+      out-of-scope questions (weather, trivia, "book me a parking spot") to see whether each system knows
+      what it doesn't know.</p>
+
+    <div class="callout"><b>A methodology correction, made before publishing:</b> the first automated pass
+      scored chatbot_classifier.py at 79/107. Reading the actual failing answers showed 12 of those were a grading bug,
+      not a real failure &mdash; e.g. asked "are both room 101 and 104 occupied?", chatbot_classifier.py correctly
+      reported both rooms' status but never used the literal word "both," which the checker required. The
+      checker was fixed to accept any answer that gets the underlying facts right regardless of phrasing,
+      and all 107&times;3 answers were re-graded from the saved transcripts &mdash; no new model calls, same
+      underlying data. Final score: <b>91/107</b>. The corrected categories are called out below rather than
+      silently folded in.</div>
+  </section>
+
+  <section id="results">
+    <div class="section-head"><span class="section-num">03</span><h2 class="section-title">Results</h2></div>
+
+    <div class="summary-grid">
+      <div class="sys-card" style="--c:var(--sys-cb)">
+        <span class="tag" style="color:var(--sys-cb); background:var(--sys-cb-bg)">chatbot_classifier.py</span>
+        <div class="big">91<span class="muted" style="font-size:16px">/107</span></div>
+        <div class="metric-row">
+          <div class="metric-label"><span>accuracy</span><span class="v">85.0%</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:85.0%;background:var(--sys-cb)"></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-label"><span>avg latency</span><span class="v">1,645 ms</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:17.7%;background:var(--sys-cb)"></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-label"><span>tokens (in / out)</span><span class="v">69.6K / 8.8K</span></div>
+        </div>
+      </div>
+
+      <div class="sys-card" style="--c:var(--sys-cf)">
+        <span class="tag" style="color:var(--sys-cf); background:var(--sys-cf-bg)">chatbot_nl2cypher.py</span>
+        <div class="big">89<span class="muted" style="font-size:16px">/107</span></div>
+        <div class="metric-row">
+          <div class="metric-label"><span>accuracy</span><span class="v">83.2%</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:83.2%;background:var(--sys-cf)"></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-label"><span>avg latency</span><span class="v">2,493 ms</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:26.9%;background:var(--sys-cf)"></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-label"><span>tokens (in / out)</span><span class="v">178K / 11.6K</span></div>
+        </div>
+      </div>
+
+      <div class="sys-card" style="--c:var(--sys-da)">
+        <span class="tag" style="color:var(--sys-da); background:var(--sys-da-bg)">tool-calling-agent</span>
+        <div class="big">92<span class="muted" style="font-size:16px">/107</span></div>
+        <div class="metric-row">
+          <div class="metric-label"><span>accuracy</span><span class="v">86.0%</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:86.0%;background:var(--sys-da)"></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-label"><span>avg latency</span><span class="v">9,267 ms</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--sys-da)"></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-label"><span>tokens (in / out)</span><span class="v">3.39M / 75.9K</span></div>
+        </div>
+      </div>
+    </div>
+
+    <p>Headline accuracy is a near-tie &mdash; 83&ndash;86% across all three &mdash; which makes it the least
+      interesting number on this page. Cost and latency are not close: tool-calling-agent used roughly
+      <b>48&times;</b> the input tokens of chatbot_classifier.py and ran <b>5.6&times;</b> slower on average, because its
+      multi-turn tool loop resends the growing conversation (including large tool-result payloads) on every
+      iteration, instead of one classify-then-query shot. At an estimated $3 / $15 per million input/output
+      tokens (Anthropic's exact current rate couldn't be independently confirmed at the time of writing),
+      that's roughly <b>$0.003</b> per question for chatbot_classifier.py versus roughly <b>$0.11</b> per question for
+      tool-calling-agent &mdash; about <b>33&times;</b> more expensive per answer.</p>
+
+    <h3 style="font-size:19px;margin-block:28px 6px">Where each one actually breaks</h3>
+    <p>The tie in headline accuracy hides three completely different failure patterns. This table shows every
+      category where at least one system failed &mdash; full agreement rows are collapsed into the sentence
+      below it.</p>
+
+    <div class="table-scroll">
+      <table class="cat">
+        <thead><tr><th>Category</th><th>chatbot_classifier.py</th><th>chatbot_nl2cypher.py</th><th>tool-calling-agent</th></tr></thead>
+        <tbody>
+          <tr><td class="catname">All-time occupancy rate<span class="id">alltime_occupancy_rate</span></td>
+            <td class="cell cell-zero">0/5</td><td class="cell cell-full">5/5</td><td class="cell cell-full">5/5</td></tr>
+          <tr><td class="catname">Compound (two facts, one answer)<span class="id">compound</span></td>
+            <td class="cell cell-zero">0/5</td><td class="cell cell-full">5/5</td><td class="cell cell-full">5/5</td></tr>
+          <tr><td class="catname">Room metadata / mechanical rooms<span class="id">room_info</span></td>
+            <td class="cell cell-partial">3/6</td><td class="cell cell-full">6/6</td><td class="cell cell-full">6/6</td></tr>
+          <tr><td class="catname">Out-of-scope questions<span class="id">fallback</span></td>
+            <td class="cell cell-partial">9/12</td><td class="cell cell-zero">0/12</td><td class="cell cell-full">11/12</td></tr>
+          <tr><td class="catname">Next-hour occupancy forecast<span class="id">occupancy_forecast</span></td>
+            <td class="cell cell-full">8/8</td><td class="cell cell-zero">2/8</td><td class="cell cell-full">8/8</td></tr>
+          <tr><td class="catname">All-time coldest (global)<span class="id">alltime_coldest</span></td>
+            <td class="cell cell-full">2/2</td><td class="cell cell-full">2/2</td><td class="cell cell-zero">0/2</td></tr>
+          <tr><td class="catname">All-time hottest, specific room<span class="id">alltime_hottest_room</span></td>
+            <td class="cell cell-full">6/6</td><td class="cell cell-full">6/6</td><td class="cell cell-partial">2/6</td></tr>
+          <tr><td class="catname">All-time coldest, specific room<span class="id">alltime_coldest_room</span></td>
+            <td class="cell cell-full">6/6</td><td class="cell cell-full">6/6</td><td class="cell cell-partial">1/6</td></tr>
+          <tr><td class="catname">Current temp, multi-room compare<span class="id">current_temp_multiroom</span></td>
+            <td class="cell cell-full">8/8</td><td class="cell cell-full">8/8</td><td class="cell cell-partial">6/8</td></tr>
+          <tr><td class="catname">Current temperature, one room<span class="id">current_temp</span></td>
+            <td class="cell cell-full">8/8</td><td class="cell cell-full">8/8</td><td class="cell cell-partial">7/8</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" style="font-size:13.5px">The other 7 categories &mdash; current hottest/coldest room,
+      all-time extremes (global), AC-to-room mapping, current occupancy (single &amp; multi-room), and
+      historical room comparisons &mdash; scored 100% for all three systems and are omitted from the table above.</p>
+
+    <div class="quote-grid">
+      <div class="quote-card" style="--c:var(--sys-cb)">
+        <div class="who">chatbot_classifier.py &mdash; a fixed taxonomy has no "other"</div>
+        <div class="q">Q: &ldquo;Does room 201 have any sensors?&rdquo;</div>
+        <div class="a">&ldquo;I don't have access to the specific building layout or sensor data for room
+          201 in this conversation. No information has been provided to me about this building's
+          configuration&hellip;&rdquo;</div>
+        <div class="note">This is false &mdash; the data exists and the bot is connected to it. There's just
+          no classifier category for "room metadata," so the question falls into the fallback chain, which
+          hallucinates a plausible-sounding reason it can't help instead of admitting the real one: it was
+          never coded to look. The same gap explains <span class="mono">compound</span> and
+          <span class="mono">alltime_occupancy_rate</span> &mdash; any question shaped unlike the ~10 intents
+          it was built for just isn't answerable, no matter how simple it actually is.</div>
+      </div>
+
+      <div class="quote-card" style="--c:var(--sys-cf)">
+        <div class="who">chatbot_nl2cypher.py &mdash; no path to "I don't know"</div>
+        <div class="q">Q: &ldquo;What's the weather like outside today?&rdquo;</div>
+        <div class="a">&ldquo;Cannot answer with the current schema.&rdquo;<br><span class="muted" style="font-style:normal;font-size:12.5px">&mdash; emitted as the literal text of a Cypher query, which then fails with a raw
+          Neo4j syntax error shown straight to the user.</span></div>
+        <div class="note">Text-to-Cypher has no decline mechanism: when the model can't express the answer
+          as a query, it tries to write English <em>as</em> a query, which the database rejects. That's
+          <b>0/12</b> on out-of-scope questions &mdash; every single one &mdash; and the same mechanism
+          breaks <span class="mono">occupancy_forecast</span> (2/8), where expressing "average occupancy at
+          this hour-of-day across two weeks" in one Cypher query is past what the model reliably generates.
+          Everywhere a direct query <em>can</em> reach, though, this was the most precise of the three &mdash;
+          100% on every lookup, comparison, and even compound two-fact questions, because Cypher joins
+          naturally handle "and also give me X."</div>
+      </div>
+
+      <div class="quote-card" style="--c:var(--sys-da)">
+        <div class="who">tool-calling-agent &mdash; honest about gaps, imprecise under a row cap</div>
+        <div class="q">Q: &ldquo;What's the lowest temperature ever recorded in room 101?&rdquo; (true answer: 16.36&deg;C, Jan 14 04:20)</div>
+        <div class="a">&ldquo;&hellip;the lowest hourly-average temperature recorded was approximately
+          17.76&deg;C, occurring at 2024-01-12 03:00 UTC.&rdquo;</div>
+        <div class="note">Off by 1.4&deg;C and the wrong day. The agent's tools return raw 5-minute readings
+          only up to a 2,000-row cap, so for a 14-day, all-rooms question it reaches for hourly averages
+          instead &mdash; which smooths away the single sharpest dip the question actually asked for. The
+          same tool set also has no function that finds a <em>minimum</em> across all rooms at once (only
+          <span class="mono">get_hot_periods</span>, which checks <em>above</em> a threshold), so for the
+          building-wide version of this question it said plainly: &ldquo;I don't have a tool that directly
+          finds an all-time minimum across all rooms in one call&hellip;&rdquo; and asked a clarifying
+          question rather than guessing. That's the one failure mode worth calling a feature: of the three
+          systems, this is the only one that reliably says "I don't know" instead of inventing an answer
+          (11/12 on out-of-scope questions, and never once a hallucinated building fact anywhere in 107
+          questions).</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="takeaways">
+    <div class="section-head"><span class="section-num">04</span><h2 class="section-title">Which one would you actually ship</h2></div>
+    <p>Not "which one wins" &mdash; each one wins a different deployment. The honest read of 107 questions:</p>
+
+    <div class="decision">
+      <div class="decision-row">
+        <div class="who" style="color:var(--sys-cb)">Pick chatbot_classifier.py when&hellip;</div>
+        <p>the set of questions is small and known in advance, latency and cost matter (lobby kiosk, SMS
+          bot, anything called at volume), and you can live with a hard wall around what it answers.
+          <b>33&times; cheaper and 5.6&times; faster</b> than the agent for the questions it was built to
+          handle &mdash; but a new question shape means a code change, not a prompt tweak, and it will
+          confidently claim "no data" for things it actually has.</p>
+      </div>
+      <div class="decision-row">
+        <div class="who" style="color:var(--sys-cf)">Pick chatbot_nl2cypher.py when&hellip;</div>
+        <p>questions are varied but still fundamentally database lookups, an internal/trusted audience can
+          tolerate an occasional raw error screen, and you need the model to combine facts in ways you
+          didn't anticipate (it was the only system to get every single compound and comparison question
+          right). Put a guardrail in front of it for anything open-ended &mdash; it has no idea when a
+          question is outside its domain.</p>
+      </div>
+      <div class="decision-row">
+        <div class="who" style="color:var(--sys-da)">Pick tool-calling-agent when&hellip;</div>
+        <p>the audience is external or non-technical, a hallucinated answer is worse than a slow one, and
+          the question set will keep growing. It degrades the most gracefully by far and handles genuinely
+          novel, multi-step questions &mdash; at <b>roughly 33&times; the cost per answer</b> and real
+          latency (9+ seconds average), and only as good as the tools you remembered to build (no
+          minimum-finding tool here meant a systematic, fixable gap, not a one-off mistake).</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p><b>Scope and limitations:</b> one model (claude-sonnet-5), one synthetic 14-day dataset, one grading
+      pass per answer (automated keyword/number matching against ground truth, with one documented
+      correction made after reading actual failing transcripts &mdash; not a substitute for human review at
+      larger scale). Token-based cost estimates exclude Anthropic's prompt-cache read/write pricing, which
+      would lower tool-calling-agent's real-dollar disadvantage somewhat, though not by enough to close a
+      48&times; gap in raw tokens. Dollar figures use an estimated $3 / $15 per million input/output tokens;
+      published third-party trackers disagreed on Anthropic's exact current rate at the time of writing.</p>
+  </footer>
+
+</div>
+
+</body>
+</html>

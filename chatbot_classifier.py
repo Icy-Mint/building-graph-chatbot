@@ -1,8 +1,8 @@
-# chatbot.py
+# chatbot_classifier.py
 """Streamlit chatbot (v1) that classifies a question into a fixed action set
 via an LLM, then answers either from sensor data (CSVs by default, or
-dorm-agent's local TimescaleDB -- see SENSOR_BACKEND) or a single hardcoded
-Cypher query against Neo4j. Unlike chatbotForecast.py, no LLM-generated
+tool-calling-agent's local TimescaleDB -- see SENSOR_BACKEND) or a single hardcoded
+Cypher query against Neo4j. Unlike chatbot_nl2cypher.py, no LLM-generated
 Cypher ever executes here — the only Cypher is the fixed ac_mapping query
 below."""
 import json
@@ -24,14 +24,14 @@ load_dotenv()
 
 SENSOR_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sensor_outputs")
 
-# "csv" (default, sensor_outputs/*.csv) | "timescaledb" (dorm-agent's local
+# "csv" (default, sensor_outputs/*.csv) | "timescaledb" (tool-calling-agent's local
 # instance, same schema this project's Graph.cypher loads into Neo4j --
 # points the Neo4j connection below at a local, self-hosted alternative to
 # Aura too, via the same NEO4J_URI/USERNAME/PASSWORD vars -- no code change
 # needed for that half, since the schemas now match).
 SENSOR_BACKEND = os.getenv("SENSOR_BACKEND", "csv").lower()
 
-# Same provider-swap as chatbotForecast.py, so the two bots can be benchmarked
+# Same provider-swap as chatbot_nl2cypher.py, so the two bots can be benchmarked
 # on the same LLM without code changes.
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
 
@@ -89,10 +89,10 @@ def _build_llm():
         # model" -- confirmed live), unlike the other three providers.
         # ChatAnthropic defaults to max_tokens=1024 and omits `thinking`
         # entirely, which lets the model default to extended thinking --
-        # confirmed live (in dorm-agent, same model) that thinking alone can
+        # confirmed live (in tool-calling-agent, same model) that thinking alone can
         # consume the whole 1024-token budget before any real output, making
         # responses silently empty. Disabled explicitly for the same reason
-        # dorm-agent disables it: this task doesn't need deep reasoning.
+        # tool-calling-agent disables it: this task doesn't need deep reasoning.
         return ChatAnthropic(
             model=model,
             max_tokens=2048,
@@ -142,7 +142,7 @@ def _pivot_readings_to_tables(rows) -> dict:
 
 
 def _load_tables_from_timescaledb() -> dict:
-    """Uses dorm-agent's genuine read-only Postgres role, never the admin one."""
+    """Uses tool-calling-agent's genuine read-only Postgres role, never the admin one."""
     import psycopg
 
     conn = psycopg.connect(
@@ -239,7 +239,7 @@ class SensorHelper:
     def occupancy_forecast(self, room=None):
         """Naive next-hour occupancy forecast: probability of being occupied
         at the upcoming hour, averaged from history at that hour-of-day.
-        Hour-of-day only (no day-of-week split) -- mirrors chatbotForecast.py's
+        Hour-of-day only (no day-of-week split) -- mirrors chatbot_nl2cypher.py's
         forecast approach so the two architectures can be compared on equal
         footing rather than one having a richer forecasting method by
         accident of implementation."""
@@ -352,7 +352,7 @@ def get_fallback_chain() -> LLMChain:
 
 # ─────────────────────────────────────────
 # OBSERVABILITY
-# Same log shape/location as chatbotForecast.py (different filename) so the
+# Same log shape/location as chatbot_nl2cypher.py (different filename) so the
 # two bots' logs can be compared directly.
 # ─────────────────────────────────────────
 LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "chatbot_v1_log.jsonl")
@@ -398,7 +398,7 @@ def ask(query, classification_chain, fallback_chain, parser, graph_helper, senso
     usage_callback, if given, is called once with a {model: {input_tokens,
     output_tokens, ...}} dict (aggregated across every LLM call this turn
     made -- classification, and the fallback chain if it ran) before
-    returning, mirroring the on_attempt pattern in chatbotForecast.ask_graph:
+    returning, mirroring the on_attempt pattern in chatbot_nl2cypher.ask_graph:
     extra observability without changing this function's existing
     (answer, action, rooms) return shape that callers and tests rely on.
     """
@@ -478,7 +478,7 @@ def _is_error(answer: str) -> bool:
 
 # ─────────────────────────────────────────
 # STREAMLIT UI
-# Only runs under `streamlit run chatbot.py` — importing this module (e.g.
+# Only runs under `streamlit run chatbot_classifier.py` — importing this module (e.g.
 # from a test) no longer builds a chain, opens a Neo4j driver, or reads CSVs.
 # ─────────────────────────────────────────
 def main():

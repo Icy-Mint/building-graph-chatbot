@@ -34,7 +34,7 @@ def run_read_only(session, query: str, **params):
     Neo4j Community edition (what docker-compose.yml runs) has no per-role
     access control at all -- that's an Enterprise-only feature -- so this is
     an application-level substitute, not a DB-level guarantee. It's lower
-    risk here than it was for the sibling chatbotForecast.py project: every
+    risk here than it was for the sibling chatbot_nl2cypher.py project: every
     query the tool layer runs is hand-written and fixed (see
     app/tools/graph_tools.py), never LLM-generated, so this is defense in
     depth against a future bug, not the primary line of defense against
