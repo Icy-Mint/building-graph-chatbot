@@ -191,6 +191,46 @@ def test_occupancy_pattern_still_reports_historical_hours():
     assert action == "occupancy_pattern"
 
 
+def make_forecast_sensor_helper():
+    """Occupancy=1 at every hour of day for room 101, occupancy=0 at every
+    hour for room 102 -- deterministic regardless of the real wall-clock
+    hour when the test runs, since occupancy_forecast() looks at
+    (real_now + 1 hour)."""
+    hours = pd.date_range("2024-01-01 00:00", periods=24, freq="h")
+    sh = SensorHelper.__new__(SensorHelper)
+    sh.tables = {
+        "101": pd.DataFrame({"timestamp": hours, "temperature": [21.0] * 24, "occupancy": [1] * 24}),
+        "102": pd.DataFrame({"timestamp": hours, "temperature": [21.0] * 24, "occupancy": [0] * 24}),
+    }
+    return sh
+
+
+def test_occupancy_forecast_specific_room_reports_probability():
+    chain = FakeChain([classify("occupancy_forecast", "101")])
+    sensor_helper = make_forecast_sensor_helper()
+
+    answer, action, room = ask(
+        "will room 101 be occupied in the next hour?",
+        chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+    )
+
+    assert action == "occupancy_forecast"
+    assert "100%" in answer
+
+
+def test_occupancy_forecast_no_room_lists_likely_occupied_rooms():
+    chain = FakeChain([classify("occupancy_forecast", None)])
+    sensor_helper = make_forecast_sensor_helper()
+
+    answer, action, room = ask(
+        "what's the occupancy forecast for the next hour?",
+        chain, FakeChain([]), parser, FakeGraphHelper([]), sensor_helper
+    )
+
+    assert "101" in answer
+    assert "102" not in answer  # room 102 is always-vacant, below the 50% threshold
+
+
 def test_ac_mapping_formats_rows():
     chain = FakeChain([classify("ac_mapping", None)])
     graph_helper = FakeGraphHelper([

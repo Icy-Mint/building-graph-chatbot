@@ -203,7 +203,19 @@ def _build_llm():
         from langchain_anthropic import ChatAnthropic
         # claude-sonnet-5 rejects `temperature` entirely ("deprecated for this
         # model" -- confirmed live), unlike the other three providers.
-        return ChatAnthropic(model=model, anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"))
+        # ChatAnthropic defaults to max_tokens=1024 and omits `thinking`
+        # entirely, which lets the model default to extended thinking --
+        # confirmed live (in dorm-agent, same model) that thinking alone can
+        # consume the whole 1024-token budget before any real output, making
+        # responses silently empty. Disabled explicitly; this chain's two
+        # calls (Cypher generation, then answer formatting) don't need deep
+        # reasoning either.
+        return ChatAnthropic(
+            model=model,
+            max_tokens=2048,
+            thinking={"type": "disabled"},
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+        )
 
     raise ValueError(f"Unknown LLM_PROVIDER '{LLM_PROVIDER}'. Use one of: {', '.join(_DEFAULT_MODELS)}")
 
@@ -429,7 +441,7 @@ def main():
                     .reset_index(name="p_occ")
                 )
 
-                next_hour = pd.Timestamp.utcnow().round("H") + pd.Timedelta(hours=1)
+                next_hour = pd.Timestamp.now("UTC").round("H") + pd.Timedelta(hours=1)
                 h = next_hour.hour
                 likely_occ = prob[
                     (prob["hour_of_day"] == h) & (prob["p_occ"] >= 0.5)

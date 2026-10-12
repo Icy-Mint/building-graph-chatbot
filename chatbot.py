@@ -76,7 +76,18 @@ def _build_llm():
         from langchain_anthropic import ChatAnthropic
         # claude-sonnet-5 rejects `temperature` entirely ("deprecated for this
         # model" -- confirmed live), unlike the other three providers.
-        return ChatAnthropic(model=model, anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"))
+        # ChatAnthropic defaults to max_tokens=1024 and omits `thinking`
+        # entirely, which lets the model default to extended thinking --
+        # confirmed live (in dorm-agent, same model) that thinking alone can
+        # consume the whole 1024-token budget before any real output, making
+        # responses silently empty. Disabled explicitly for the same reason
+        # dorm-agent disables it: this task doesn't need deep reasoning.
+        return ChatAnthropic(
+            model=model,
+            max_tokens=2048,
+            thinking={"type": "disabled"},
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+        )
 
     raise ValueError(f"Unknown LLM_PROVIDER '{LLM_PROVIDER}'. Use one of: {', '.join(_DEFAULT_MODELS)}")
 
@@ -171,6 +182,35 @@ class SensorHelper:
         return (f"Room {best_room} is currently the coldest at {best.temperature:.1f} °C "
                 f"(as of {best.timestamp.strftime('%Y-%m-%d %H:%M')}).")
 
+    def occupancy_forecast(self, room=None):
+        """Naive next-hour occupancy forecast: probability of being occupied
+        at the upcoming hour, averaged from history at that hour-of-day.
+        Hour-of-day only (no day-of-week split) -- mirrors chatbotForecast.py's
+        forecast approach so the two architectures can be compared on equal
+        footing rather than one having a richer forecasting method by
+        accident of implementation."""
+        next_hour = (pd.Timestamp.now("UTC") + pd.Timedelta(hours=1)).hour
+
+        if room is not None:
+            df = self.tables.get(room)
+            if df is None:
+                return f"No occupancy data for room {room}"
+            at_hour = df[df.timestamp.dt.hour == next_hour]
+            if at_hour.empty:
+                return f"No historical data for room {room} at hour {next_hour}:00 to forecast from."
+            prob = at_hour.occupancy.mean()
+            return (f"Room {room} has a {prob:.0%} historical probability of being occupied "
+                    f"around {next_hour}:00 (the next hour), based on {len(at_hour)} past readings at that hour.")
+
+        likely = []
+        for r, df in self.tables.items():
+            at_hour = df[df.timestamp.dt.hour == next_hour]
+            if not at_hour.empty and at_hour.occupancy.mean() >= 0.5:
+                likely.append(r)
+        if not likely:
+            return f"No room crosses the 50% occupancy probability threshold for the next hour ({next_hour}:00)."
+        return f"Rooms likely occupied around {next_hour}:00 (the next hour): {', '.join(sorted(likely))}."
+
 
 # ─────────────────────────────────────────
 # PROMPTS (pure strings/objects, no side effects — safe to import)
@@ -178,7 +218,8 @@ class SensorHelper:
 response_schemas = [
     ResponseSchema(name="action", description=(
         "One of: current_hottest, current_coldest, current_temp, alltime_hottest, "
-        "alltime_coldest, current_occupancy, occupancy_pattern, ac_mapping, fallback"
+        "alltime_coldest, current_occupancy, occupancy_pattern, occupancy_forecast, "
+        "ac_mapping, fallback"
     )),
     ResponseSchema(name="room", description="Room number if mentioned, else null")
 ]
@@ -199,6 +240,7 @@ current_* actions unless the user explicitly says "ever", "historically",
 - alltime_coldest: the lowest temperature ever recorded (explicitly historical)
 - current_occupancy: whether a SPECIFIC room is occupied right now (yes/no status)
 - occupancy_pattern: when a room is typically/usually occupied (a pattern across hours, not current status)
+- occupancy_forecast: a FUTURE/predicted occupancy question (e.g. "will", "forecast", "predict", "next hour") -- not current or historical status
 - ac_mapping: user asks which AC unit services which rooms
 - fallback: all other questions
 
@@ -321,6 +363,12 @@ def ask(query, classification_chain, fallback_chain, parser, graph_helper, senso
                 answer = sensor_helper.occupancy_pattern(room)
             else:
                 answer = "\n".join(sensor_helper.occupancy_pattern(r) for r in sensor_helper.tables)
+
+        elif action == "occupancy_forecast":
+            if room and room in sensor_helper.tables:
+                answer = sensor_helper.occupancy_forecast(room)
+            else:
+                answer = sensor_helper.occupancy_forecast()
 
         elif action == "ac_mapping":
             result = graph_helper("""
