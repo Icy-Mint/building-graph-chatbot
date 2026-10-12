@@ -10,14 +10,15 @@ This is a separate subproject from the Streamlit bots one level up
 Docker Compose, Claude tool-use agent vs. single-file Streamlit apps),
 different dependencies, its own venv.
 
-## Status: Step 4 of 6 — verified live
+## Status: Steps 1–4 and 6 done, verified live; Step 5 not started
 
 The Neo4j graph model, the TimescaleDB time-series generator, the tool
-layer, and the agent loop are all built and now confirmed against the real
-Anthropic API (an `ANTHROPIC_API_KEY` became available after Step 4 was
-first built against a fake client only — see "Live verification" below for
-what that first real run caught). Steps 5–6 (FastAPI/Streamlit UI, eval
-harness) are not started.
+layer, the agent loop, and the eval harness are all built and confirmed
+against the real Anthropic API (an `ANTHROPIC_API_KEY` became available
+after Step 4 was first built against a fake client only — see "Live
+verification" below for what that first real run caught). Step 5
+(FastAPI/Streamlit UI) is not started -- see "Eval harness" and "Roadmap"
+below.
 
 ## Graph model
 
@@ -261,11 +262,55 @@ write-up -- method, results, and where each architecture actually breaks:
 **[icy-mint.github.io/building-graph-chatbot](https://icy-mint.github.io/building-graph-chatbot/)**
 (source: `../docs/index.html`). Raw results: `../compare_systems_results_full.json`.
 
+## Eval harness (Step 6)
+
+`evals/golden.yaml` -- 28 cases covering pure graph/time-series lookups,
+multi-hop (hot rooms -> their AC), forecasting, ambiguous/nonexistent
+rooms, mechanical-room-has-no-sensors, no-data date ranges, out-of-scope
+questions, and 3 prompt-injection attempts. Scoring is deterministic (tool
+selection, argument accuracy, tool status, answer-text checks, and numeric
+fact checks against ground truth computed live from the database, never
+hand-typed in the YAML) -- no LLM needed to grade. `evals/run_eval.py`
+runs it against the real agent and writes a timestamped JSON report plus
+`latest.json`.
+
+```bash
+make eval         # deterministic scoring only
+make eval-judge    # + an LLM-as-judge faithfulness pass (claude-haiku-5-5,
+                    # a different/cheaper model than the agent) -- extra
+                    # cost per run, off by default
+```
+
+Latest run: **26/28** deterministic (the 2 misses are a known precision
+tradeoff -- see "Two real bugs" above -- and a paraphrase the keyword
+checker didn't anticipate, not an agent fault; both pass the LLM-judge
+pass). This is a different thing from the `compare_systems.py` comparison
+above: that grades final-answer correctness across all three chatbot
+architectures, this grades THIS agent's tool-selection/argument accuracy
+and the injection/drift checks the spec specifically asked for.
+
+**The LLM-judge pass earned its keep on the first real run**: it caught a
+genuine, intermittent hallucination the deterministic checks missed
+entirely -- asked a question with no reason to mention AC units at all,
+the model once volunteered "room 105 is serviced by AC1" (it's actually
+AC2) and cited `get_ac_for_room`/`get_rooms_serviced_by_ac` as the source,
+despite never calling either (only `get_occupancy` was called). A
+regression guard for this exact case is now in `golden.yaml`. The judge
+also has a calibration quirk worth knowing before trusting its "NO"
+verdicts at face value: it treats the model doing simple, correct
+arithmetic over real tool-returned numbers (e.g. averaging several hourly
+readings, which some questions have no dedicated tool for and inherently
+require) as "unsupported," which isn't the same thing as fabrication --
+its "YES/NO" faithfulness label needs a human reading the reason, not
+blind trust, especially for anything the model had to compute itself.
+
+`tests/test_prompt_schema_drift.py` -- the drift guard: fails if
+`SYSTEM_PROMPT`'s room/AC counts and ids disagree with `model.py`, if
+`model.py` disagrees with the live Neo4j schema, or if a tool's declared
+JSON schema (what the model sees) disagrees with its real Python
+signature. Introspects the actual schema rather than hand-maintaining a
+duplicate description of it, per the spec.
+
 ## Roadmap (not yet built)
 
 5. FastAPI + Streamlit UI
-6. A dedicated eval harness scoped to just this agent (25+ golden cases,
-   deterministic scoring, a prompt-injection test case, a drift guard) --
-   distinct from the repo-level `compare_systems.py` comparison above,
-   which covers accuracy/cost/latency across all three systems but not
-   this file's originally planned injection/drift checks.
