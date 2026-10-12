@@ -74,7 +74,9 @@ def _build_llm():
 
     if LLM_PROVIDER == "anthropic":
         from langchain_anthropic import ChatAnthropic
-        return ChatAnthropic(model=model, temperature=0, anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"))
+        # claude-sonnet-5 rejects `temperature` entirely ("deprecated for this
+        # model" -- confirmed live), unlike the other three providers.
+        return ChatAnthropic(model=model, anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"))
 
     raise ValueError(f"Unknown LLM_PROVIDER '{LLM_PROVIDER}'. Use one of: {', '.join(_DEFAULT_MODELS)}")
 
