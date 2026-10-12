@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="A controlled, 107-question comparison of three LLM chatbot architectures over the same knowledge graph and sensor database -- fixed intent classification, text-to-Cypher, and a typed-tool agent -- graded against independently computed ground truth.">
+<meta name="description" content="A controlled, 107-question comparison of three LLM chatbot architectures over the same building-sensor knowledge graph and time-series database -- fixed intent classification, text-to-Cypher, and a typed-tool agent -- graded against independently computed ground truth.">
 <title>Three Architectures, One Dorm</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -146,12 +146,12 @@
 <div class="wrap">
 
   <div class="hero">
-    <div class="eyebrow">Case study &middot; agentic architecture benchmark</div>
+    <div class="eyebrow">Building systems &middot; agentic architecture benchmark</div>
     <h1 class="title">Three architectures, one dorm</h1>
-    <p class="dek">Same questions. Same model. Same database. Three different ways of letting an LLM answer
-      questions about a building's sensors &mdash; a fixed intent classifier, a text-to-Cypher chain, and a
-      typed tool-calling agent &mdash; graded against ground truth computed directly from the database, not
-      from any of the systems being tested.</p>
+    <p class="dek">A small, controlled stand-in for a real facilities problem: a building graph plus
+      sensor time-series, three different ways to let an LLM answer questions over it &mdash; a fixed
+      intent classifier, a text-to-Cypher chain, and a typed tool-calling agent &mdash; graded against
+      ground truth computed directly from the database, not from any of the systems being tested.</p>
     <div class="stat-strip">
       <div class="stat-chip"><b>107</b><span class="muted">questions</span></div>
       <div class="stat-chip"><b>3</b><span class="muted">architectures</span></div>
@@ -162,9 +162,23 @@
 
   <section id="why">
     <div class="section-head"><span class="section-num">01</span><h2 class="section-title">Why this comparison</h2></div>
-    <p>Any team that puts a chatbot in front of a database &mdash; a building's sensor graph, a product
-      catalog, a support ticket queue &mdash; ends up choosing between the same three shapes, usually on
-      instinct rather than evidence:</p>
+    <p>A mechanical or building-systems team rarely has one dataset. They have a pile of disconnected
+      time-series: zone temperature and humidity off the BMS, CO&#8322;/air quality from IAQ sensors,
+      whole-building and sub-metered energy, a utility or weather feed, sometimes a carbon-intensity
+      signal layered on top &mdash; each on its own cadence, some live, some only historical, a few with a
+      forecast bolted on. None of that is the hard part. The hard part is that no one on the facilities
+      team can <em>ask</em> it anything: "which zone is running hot right now," "has this AHU been
+      short-cycling this week," "where's our decarbonization headroom" each mean opening three dashboards,
+      exporting a CSV, and doing the join by hand.</p>
+
+    <p>This project is a small, deliberately scaled-down slice of that problem: link a fraction of it
+      &mdash; a building graph (rooms, AC units) plus sensor time-series (temperature, occupancy) &mdash;
+      and put a chatbot on top, so a building management team could pull live or historical conditions on
+      demand, build a report from the answer, or catch an emerging fault ahead of the service ticket. The
+      dorm stands in for a small building portfolio; temperature and occupancy stand in for the fuller
+      mechanical stack (temp/humidity/air-quality/energy/carbon, live or predicted). What doesn't shrink
+      with the demo is the architecture decision underneath it &mdash; every team doing this for real ends
+      up choosing between the same three shapes, usually on instinct rather than evidence:</p>
 
     <div class="arch-row">
       <div class="arch-card" style="--c:var(--sys-cb)">
@@ -188,14 +202,17 @@
       taxonomies are "fast and cheap but brittle," text-to-query is "flexible but unsafe," agents are
       "robust but slow and expensive." Those claims are directionally true and almost never measured. This
       project holds the model, the database, and the questions constant and measures what actually happens:
-      not just <em>how often</em> each one is right, but <em>how</em> each one is wrong &mdash; because the
-      failure shape turns out to matter more than the failure rate.</p>
+      not just <em>how often</em> each one is right, but <em>how</em> each one is wrong &mdash; because for
+      a facilities team deciding whether to trust a chatbot's answer in a report, the failure shape matters
+      more than the failure rate.</p>
 
     <div class="callout">The building itself is synthetic but not arbitrary: a 2-floor dorm wing with 6
       dorm rooms and 2 mechanical rooms, 2 AC units each serving 3 rooms, temperature + occupancy sensors on
       a 5-minute cadence for 14 days &mdash; <b>48,384 readings</b> generated from a deterministic model
       (sinusoidal temperature profiles, hour-of-day occupancy probabilities) so every ground-truth answer
-      below can be checked exactly, including against the generator that produced the data.</div>
+      below can be checked exactly, including against the generator that produced the data. Standing in for
+      temperature/humidity/air-quality/energy/carbon lets the comparison stay checkable end to end; nothing
+      about the three architectures depends on which sensor types are behind them.</div>
   </section>
 
   <section id="method">
@@ -379,7 +396,11 @@
 
   <section id="takeaways">
     <div class="section-head"><span class="section-num">04</span><h2 class="section-title">Which one would you actually ship</h2></div>
-    <p>Not "which one wins" &mdash; each one wins a different deployment. The honest read of 107 questions:</p>
+    <p>Not "which one wins" &mdash; each one wins a different deployment. For a facilities team, that maps
+      roughly onto <em>how the chatbot gets used</em>: a kiosk answering the same handful of questions all
+      day, an internal tool for engineers who can shrug off an occasional error screen, or a report-facing
+      assistant where a hallucinated number is the one failure that can't be tolerated. The honest read of
+      107 questions:</p>
 
     <div class="decision">
       <div class="decision-row">
