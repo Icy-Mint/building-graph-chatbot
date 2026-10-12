@@ -466,7 +466,49 @@
           manufacturer's cloud API, or a managed IoT platform (AWS IoT Core, Azure IoT Hub / Digital
           Twins) streaming live telemetry. That surfaces what this demo can't: real sensor dropouts and
           data gaps, auth/rate-limits on the data side, multi-building schemas nobody hand-designed to be
-          clean, and whether typed-tool and NL-to-Cypher still hold up once the graph isn't tidy.</div>
+          clean, and whether typed-tool and NL-to-Cypher still hold up once the graph isn't tidy. The MCP
+          server below is the piece that makes swapping in that real source possible without touching the
+          agent.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="mcp">
+    <div class="section-head"><span class="section-num">06</span><h2 class="section-title">Added since this ran: an MCP server</h2></div>
+    <p>tool-calling-agent grew a <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener">Model
+      Context Protocol</a> server (<span class="mono">mcp_server/</span>) over the same 7 typed tools this
+      page's results are based on. It changes nothing measured above &mdash; same functions, same
+      validation, same read-only enforcement, just a second, standardized way to reach them &mdash; so
+      it's worth being specific about what it actually buys, what it costs, and why it was built at all.</p>
+
+    <div class="arch-row">
+      <div class="arch-card" style="--c:var(--sys-da)">
+        <div class="name">Capability</div>
+        <div class="how">Any MCP-compatible client &mdash; Claude Desktop, another agent framework, an
+          IDE &mdash; can now call these building tools with no custom integration code; the protocol is
+          the interface, not a bespoke API. The SDK auto-derives each tool's JSON schema from its Python
+          type hints and auto-coerces arguments (ISO date strings, lists) into what the functions expect
+          &mdash; verified live against the real database &mdash; so the 7 tool functions themselves
+          needed zero changes to gain this.</div>
+      </div>
+      <div class="arch-card" style="--c:var(--sys-cf)">
+        <div class="name">Tradeoff</div>
+        <div class="how">A second schema-derivation path is a second place for drift to creep in: the
+          drift-guard test added for the eval harness checks the Anthropic-tool-use schemas against the
+          real function signatures, but doesn't yet check the MCP server's auto-derived ones against that
+          same source of truth. It also pulls in a surprising amount of infrastructure (starlette, uvicorn,
+          cryptography) for what's currently a stdio-only use case, and ships with no auth or rate
+          limiting &mdash; fine for a trusted local client, not yet for anything broader.</div>
+      </div>
+      <div class="arch-card" style="--c:var(--sys-cb)">
+        <div class="name">Where it actually matters</div>
+        <div class="how">Not in this project, where it's the same process serving the same synthetic data
+          either way. MCP's real value shows up when the backend changes and the agent shouldn't have to:
+          the same agent loop could point at a real BMS (Niagara/Tridium, Honeywell, Siemens Desigo), a
+          sensor manufacturer's cloud API, or AWS IoT Core / Azure IoT Hub, by writing a new MCP server
+          against <em>that</em> API &mdash; zero changes to the agent, since it only ever speaks MCP,
+          never a specific vendor's SDK. That's the actual on-ramp for the "test against real building
+          data" item to the left.</div>
       </div>
     </div>
   </section>
