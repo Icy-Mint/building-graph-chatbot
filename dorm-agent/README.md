@@ -212,11 +212,31 @@ python -m app.timeseries.schema
 python -m app.timeseries.generate --seed 42 --days 14
 python -m app.timeseries.readonly_role   # creates the read-only Postgres role
 
-pytest   # 60 tests: offline model/safety/agent-loop checks + live tool-layer tests against the containers above
+python -m app.graph.load_readings   # duplicates TimescaleDB's readings into Neo4j as Reading
+                                     # nodes -- see "Shared local database" below for why
 
-# requires ANTHROPIC_API_KEY in .env -- not yet verified to work:
+pytest   # 62 tests: offline model/safety/agent-loop checks + live tool-layer tests against the containers above
+
+# requires ANTHROPIC_API_KEY in .env:
 python -c "from app.agent.loop import ask; print(ask('Which rooms does AC1 service?'))"
 ```
+
+## Shared local database (optional)
+
+This Neo4j database can be used as a local, self-hosted alternative to the
+`chatbot.py`/`chatbotForecast.py` Streamlit bots' Neo4j Aura instance one
+level up -- same schema (`Room.room_number`, `AC_Unit.ac_id`, `Sensor
+{sensor_id, sensor_type}`, `Reading` nodes), same AC-unit id format (`AC1`/
+`AC2`, no hyphen). Point those two files' `NEO4J_URI`/`NEO4J_USERNAME`/
+`NEO4J_PASSWORD` at this instance instead of Aura and they work unmodified
+-- `chatbotForecast.py` in particular needs no prompt or schema-description
+changes at all, since its existing few-shot examples already describe this
+exact naming. `app/graph/load_readings.py` is what makes that possible:
+TimescaleDB stays the source of truth for sensor data, and this script
+duplicates it into Neo4j as `Reading` nodes purely so `chatbotForecast.py`'s
+single-Cypher-query design (which expects sensor data to live in Neo4j) has
+something to query. Re-run it after `generate.py` if you regenerate with a
+different seed/date range -- it always clears and reloads, never appends.
 
 ## Roadmap (not yet built)
 
