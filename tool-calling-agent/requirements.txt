@@ -14,4 +14,7 @@ anthropic>=0.40,<1.0
 # Step 6
 pyyaml>=6.0,<7.0
 
+# MCP wrapper (mcp_server/) -- built only after Step 4 + Step 6, per spec
+mcp>=1.0,<3.0
+
 # FastAPI/streamlit get added in the steps that actually need them.

@@ -10,15 +10,15 @@ This is a separate subproject from the Streamlit bots one level up
 Docker Compose, Claude tool-use agent vs. single-file Streamlit apps),
 different dependencies, its own venv.
 
-## Status: Steps 1–4 and 6 done, verified live; Step 5 not started
+## Status: Steps 1–4 and 6 done, verified live, plus the MCP wrapper; Step 5 not started
 
 The Neo4j graph model, the TimescaleDB time-series generator, the tool
-layer, the agent loop, and the eval harness are all built and confirmed
-against the real Anthropic API (an `ANTHROPIC_API_KEY` became available
-after Step 4 was first built against a fake client only — see "Live
-verification" below for what that first real run caught). Step 5
-(FastAPI/Streamlit UI) is not started -- see "Eval harness" and "Roadmap"
-below.
+layer, the agent loop, the eval harness, and an MCP server wrapper over
+the tool layer are all built and confirmed against the real Anthropic API
+(an `ANTHROPIC_API_KEY` became available after Step 4 was first built
+against a fake client only — see "Live verification" below for what that
+first real run caught). Step 5 (FastAPI/Streamlit UI) is not started --
+see "Eval harness", "MCP server", and "Roadmap" below.
 
 ## Graph model
 
@@ -310,6 +310,32 @@ blind trust, especially for anything the model had to compute itself.
 JSON schema (what the model sees) disagrees with its real Python
 signature. Introspects the actual schema rather than hand-maintaining a
 duplicate description of it, per the spec.
+
+## MCP server (`mcp_server/`)
+
+Built only now, after Step 4 (agent) and Step 6 (evals) both work, per the
+spec's own sequencing. `mcp_server/server.py` registers the same 7
+functions from `app/tools/` directly with the `mcp` SDK's `MCPServer` --
+no tool logic, validation, or read-only enforcement is duplicated; an MCP
+client gets exactly the same hand-written, parameterized queries the
+Claude agent loop does, still with no tool that accepts raw Cypher or SQL.
+The SDK auto-derives each tool's JSON schema from the function's own type
+hints and auto-coerces JSON arguments (ISO datetime strings, lists) into
+what the functions expect -- verified live in `tests/test_mcp_server.py`,
+independently of `tool_specs.py`'s own argument parsing for the
+Anthropic-tool-use path (two separate callers now reach the same
+functions).
+
+Named `mcp_server/`, not `mcp/` as the spec's wording suggests: a local
+folder literally named `mcp/` would shadow the installed `mcp` PyPI
+package this module imports, silently breaking that import from anywhere
+else in the project that needs the real package. Not a scope change, just
+a naming collision the spec didn't anticipate.
+
+```bash
+python -m mcp_server.server   # runs over stdio
+mcp dev mcp_server/server.py   # or, with the mcp CLI, the inspector UI
+```
 
 ## Roadmap (not yet built)
 
