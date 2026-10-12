@@ -6,7 +6,7 @@ values, so no live Neo4j instance and no OpenAI key are needed.
 import pandas as pd
 import pytest
 
-from chatbot import ask, require_env_vars, parser, SensorHelper
+from chatbot import ask, require_env_vars, parser, SensorHelper, _pivot_readings_to_tables
 
 
 class FakeChain:
@@ -350,6 +350,44 @@ def test_usage_callback_fires_exactly_once_with_a_dict():
 
     assert len(received) == 1
     assert isinstance(received[0], dict)
+
+
+# ───────────────────────────────────────────────────────────────────────
+# _pivot_readings_to_tables -- the SENSOR_BACKEND=timescaledb data shaping
+# ───────────────────────────────────────────────────────────────────────
+
+def test_pivot_readings_to_tables_shapes_long_rows_into_per_room_wide_tables():
+    rows = [
+        (pd.Timestamp("2024-01-01 00:00"), "101", "temperature", 20.0),
+        (pd.Timestamp("2024-01-01 00:00"), "101", "occupancy", 1),
+        (pd.Timestamp("2024-01-01 00:05"), "101", "temperature", 21.0),
+        (pd.Timestamp("2024-01-01 00:05"), "101", "occupancy", 0),
+        (pd.Timestamp("2024-01-01 00:00"), "102", "temperature", 18.0),
+        (pd.Timestamp("2024-01-01 00:00"), "102", "occupancy", 1),
+    ]
+
+    tables = _pivot_readings_to_tables(rows)
+
+    assert set(tables.keys()) == {"101", "102"}
+    assert list(tables["101"]["temperature"]) == [20.0, 21.0]
+    assert list(tables["101"]["occupancy"]) == [1, 0]
+    assert len(tables["102"]) == 1
+
+
+def test_pivot_readings_to_tables_output_works_with_existing_sensorhelper_methods():
+    """The whole point of matching the CSV loader's shape: a table built
+    this way must work with hottest()/current_temp()/etc unmodified."""
+    rows = [
+        (pd.Timestamp("2024-01-01 00:00"), "101", "temperature", 20.0),
+        (pd.Timestamp("2024-01-01 00:00"), "101", "occupancy", 0),
+        (pd.Timestamp("2024-01-01 06:00"), "101", "temperature", 25.0),
+        (pd.Timestamp("2024-01-01 06:00"), "101", "occupancy", 1),
+    ]
+    sh = SensorHelper.__new__(SensorHelper)
+    sh.tables = _pivot_readings_to_tables(rows)
+
+    assert "25.0" in sh.current_temp("101")
+    assert "occupied" in sh.current_occupancy("101").lower()
 
 
 # ───────────────────────────────────────────────────────────────────────

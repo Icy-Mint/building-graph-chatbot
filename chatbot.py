@@ -1,9 +1,10 @@
 # chatbot.py
 """Streamlit chatbot (v1) that classifies a question into a fixed action set
-via an LLM, then answers either from local sensor CSVs (pandas) or a single
-hardcoded Cypher query against Neo4j. Unlike chatbotForecast.py, no
-LLM-generated Cypher ever executes here — the only Cypher is the fixed
-ac_mapping query below."""
+via an LLM, then answers either from sensor data (CSVs by default, or
+dorm-agent's local TimescaleDB -- see SENSOR_BACKEND) or a single hardcoded
+Cypher query against Neo4j. Unlike chatbotForecast.py, no LLM-generated
+Cypher ever executes here — the only Cypher is the fixed ac_mapping query
+below."""
 import json
 import os
 import time
@@ -22,6 +23,13 @@ from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 load_dotenv()
 
 SENSOR_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sensor_outputs")
+
+# "csv" (default, sensor_outputs/*.csv) | "timescaledb" (dorm-agent's local
+# instance, same schema this project's Graph.cypher loads into Neo4j --
+# points the Neo4j connection below at a local, self-hosted alternative to
+# Aura too, via the same NEO4J_URI/USERNAME/PASSWORD vars -- no code change
+# needed for that half, since the schemas now match).
+SENSOR_BACKEND = os.getenv("SENSOR_BACKEND", "csv").lower()
 
 # Same provider-swap as chatbotForecast.py, so the two bots can be benchmarked
 # on the same LLM without code changes.
@@ -48,6 +56,8 @@ def require_env_vars() -> None:
     key_env = _PROVIDER_API_KEY_ENV.get(LLM_PROVIDER)
     if key_env:
         required.append(key_env)
+    if SENSOR_BACKEND == "timescaledb":
+        required += ["POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_DB", "POSTGRES_READONLY_USER", "POSTGRES_READONLY_PASSWORD"]
     missing = [name for name in required if not os.getenv(name)]
     if missing:
         raise RuntimeError(
@@ -108,12 +118,55 @@ class GraphHelper:
             return f"⚠️ Cypher error : {e}"
 
 
+def _load_tables_from_csv(folder) -> dict:
+    return {
+        f.split("_")[1]: pd.read_csv(os.path.join(folder, f), parse_dates=["timestamp"])
+        for f in os.listdir(folder) if f.endswith(".csv")
+    }
+
+
+def _pivot_readings_to_tables(rows) -> dict:
+    """rows: iterable of (timestamp, room_number, sensor_type, value) tuples
+    in TimescaleDB's long/narrow format. Pure function, no DB connection --
+    kept separate from the live fetch so the shape transformation itself is
+    unit-testable without TimescaleDB. Produces the same per-room wide-table
+    shape (timestamp/temperature/occupancy columns) _load_tables_from_csv
+    does, so every other SensorHelper method works unmodified either way."""
+    long_df = pd.DataFrame(rows, columns=["timestamp", "room_number", "sensor_type", "value"])
+    tables = {}
+    for room, group in long_df.groupby("room_number"):
+        wide = group.pivot(index="timestamp", columns="sensor_type", values="value").reset_index()
+        wide.columns.name = None
+        tables[room] = wide
+    return tables
+
+
+def _load_tables_from_timescaledb() -> dict:
+    """Uses dorm-agent's genuine read-only Postgres role, never the admin one."""
+    import psycopg
+
+    conn = psycopg.connect(
+        host=os.getenv("POSTGRES_HOST"),
+        port=os.getenv("POSTGRES_PORT"),
+        user=os.getenv("POSTGRES_READONLY_USER"),
+        password=os.getenv("POSTGRES_READONLY_PASSWORD"),
+        dbname=os.getenv("POSTGRES_DB"),
+    )
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT ts, room_number, sensor_type, value FROM sensor_readings ORDER BY room_number, ts")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    return _pivot_readings_to_tables(rows)
+
+
 class SensorHelper:
     def __init__(self, folder=SENSOR_DIR):
-        self.tables = {
-            f.split("_")[1]: pd.read_csv(os.path.join(folder, f), parse_dates=["timestamp"])
-            for f in os.listdir(folder) if f.endswith(".csv")
-        }
+        if SENSOR_BACKEND == "timescaledb":
+            self.tables = _load_tables_from_timescaledb()
+        else:
+            self.tables = _load_tables_from_csv(folder)
 
     def hottest(self, room):
         df = self.tables.get(room)

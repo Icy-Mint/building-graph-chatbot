@@ -10,6 +10,11 @@ markupsafe>=2.1.3
 pandas
 pytest
 
+# Optional: only needed if SENSOR_BACKEND=timescaledb in .env (points
+# chatbot.py at dorm-agent's local TimescaleDB instead of the sensor_outputs
+# CSVs). Default SENSOR_BACKEND=csv doesn't need this.
+psycopg[binary]>=3.1,<4.0
+
 # Pin the whole langchain stack below the 1.0 line: langchain/langchain-community/
 # langchain-openai above are all built for langchain-core<1.0, and letting any
 # package pull in a newer core breaks GraphCypherQAChain/LLMChain imports outright
