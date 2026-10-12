@@ -19,7 +19,7 @@ class FakeChain:
         self.responses = list(responses)
         self.calls = []
 
-    def invoke(self, inputs):
+    def invoke(self, inputs, config=None):
         self.calls.append(inputs["query"])
         return self.responses.pop(0)
 
@@ -164,6 +164,21 @@ def test_on_attempt_fires_once_per_attempt_with_error_or_none():
     assert len(seen) == 2
     assert seen[0][0] == 0 and seen[0][2] is not None  # first attempt failed, error recorded
     assert seen[1][0] == 1 and seen[1][2] is None       # second attempt succeeded, no error
+
+
+def test_usage_callback_fires_exactly_once_with_a_dict():
+    """FakeChain never triggers real LangChain callback events, so there's
+    no token data to assert on here -- this confirms the wiring (called
+    once, with a dict) rather than real numbers, which can only be checked
+    live against the real API."""
+    chain = FakeChain([chain_resp("MATCH (r:Room) RETURN r", "room 101")])
+    graph = FakeGraph()
+    received = []
+
+    ask_graph("q", chain, graph, usage_callback=lambda u: received.append(u))
+
+    assert len(received) == 1
+    assert isinstance(received[0], dict)
 
 
 # ───────────────────────────────────────────────────────────────────────

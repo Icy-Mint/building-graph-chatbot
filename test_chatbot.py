@@ -294,6 +294,24 @@ def test_malformed_classification_output_returns_error_without_crashing():
     assert room is None
 
 
+def test_usage_callback_fires_exactly_once_with_a_dict():
+    """FakeChain never triggers real LangChain callback events, so there's
+    no token data to assert on here -- this confirms the wiring (called
+    once, with a dict) rather than real numbers, which can only be checked
+    live against the real API."""
+    chain = FakeChain([classify("ac_mapping", None)])
+    graph_helper = FakeGraphHelper([{"ac_unit": "AC1", "rooms": ["101"]}])
+    received = []
+
+    ask(
+        "which AC services which rooms?", chain, FakeChain([]), parser, graph_helper,
+        make_sensor_helper(), usage_callback=lambda u: received.append(u),
+    )
+
+    assert len(received) == 1
+    assert isinstance(received[0], dict)
+
+
 # ───────────────────────────────────────────────────────────────────────
 # require_env_vars
 # ───────────────────────────────────────────────────────────────────────

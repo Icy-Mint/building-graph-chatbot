@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
+from langchain_core.callbacks import UsageMetadataCallbackHandler
 from langchain_openai import ChatOpenAI
 from langchain_community.graphs import Neo4jGraph
 from langchain_community.chains.graph_qa.cypher import GraphCypherQAChain
@@ -261,6 +262,7 @@ def ask_graph(
     graph: Neo4jGraph,
     max_retries: int = MAX_CYPHER_RETRIES,
     on_attempt=None,
+    usage_callback=None,
 ):
     """Run the Cypher QA chain, retrying once by feeding the failure back to the LLM
     instead of silently forcing execution or swallowing the failure.
@@ -269,13 +271,19 @@ def ask_graph(
     after each attempt (error is None on success) — used to log per-attempt
     detail without changing this function's (cypher, result, error) return
     shape that callers and tests already rely on.
+
+    usage_callback, if given, is called once (right before returning) with a
+    {model: {input_tokens, output_tokens, ...}} dict aggregated across every
+    chain.invoke() this call made, including retries -- same non-invasive
+    pattern as on_attempt.
     """
     attempt_q = question
     cypher, error = "", None
+    cb = UsageMetadataCallbackHandler()
 
     for attempt in range(max_retries + 1):
         try:
-            resp = chain.invoke({"query": attempt_q})
+            resp = chain.invoke({"query": attempt_q}, config={"callbacks": [cb]})
         except Exception as e:
             resp, error = {}, str(e)
 
@@ -289,6 +297,8 @@ def ask_graph(
         if answer:
             if on_attempt:
                 on_attempt(attempt, cypher, None)
+            if usage_callback:
+                usage_callback(cb.usage_metadata)
             return cypher, answer, None
 
         rows = None
@@ -300,6 +310,8 @@ def ask_graph(
             if rows:
                 if on_attempt:
                     on_attempt(attempt, cypher, None)
+                if usage_callback:
+                    usage_callback(cb.usage_metadata)
                 return cypher, rows, None
             error = error or "Query executed but returned 0 rows."
         else:
@@ -316,6 +328,8 @@ def ask_graph(
                 f"Re-check the schema and fix the query.)"
             )
 
+    if usage_callback:
+        usage_callback(cb.usage_metadata)
     return cypher, None, error
 
 
@@ -461,6 +475,7 @@ def main():
             # ────────────────────────────────
             else:
                 attempts_log = []
+                usage = {}
                 start_time = time.time()
                 with st.spinner("Thinking…"):
                     cypher, result, error = ask_graph(
@@ -468,6 +483,7 @@ def main():
                         on_attempt=lambda i, c, e: attempts_log.append(
                             {"attempt": i, "cypher": c, "error": e}
                         ),
+                        usage_callback=usage.update,
                     )
 
                 log_interaction({
@@ -481,6 +497,7 @@ def main():
                     "retries": max(len(attempts_log) - 1, 0),
                     "latency_ms": round((time.time() - start_time) * 1000),
                     "attempts": attempts_log,
+                    "usage": usage,
                 })
 
                 shown_cypher = cypher if cypher else "(no Cypher generated)"

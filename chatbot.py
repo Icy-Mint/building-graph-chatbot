@@ -13,6 +13,7 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 from neo4j import GraphDatabase
+from langchain_core.callbacks import UsageMetadataCallbackHandler
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
@@ -310,14 +311,25 @@ def log_interaction(entry: dict) -> None:
 # Dependency-injected (chains/helpers passed in, not read from globals) so it
 # can be unit-tested with fakes — no Streamlit runtime, no live Neo4j/OpenAI.
 # ─────────────────────────────────────────
-def ask(query, classification_chain, fallback_chain, parser, graph_helper, sensor_helper):
+def ask(query, classification_chain, fallback_chain, parser, graph_helper, sensor_helper, usage_callback=None):
     """Classify the question into a fixed action set, then dispatch to pandas
     (sensor CSVs) or a hardcoded Cypher query. Returns (answer, action, room);
     action/room are None if classification itself failed.
+
+    usage_callback, if given, is called once with a {model: {input_tokens,
+    output_tokens, ...}} dict (aggregated across every LLM call this turn
+    made -- classification, and the fallback chain if it ran) before
+    returning, mirroring the on_attempt pattern in chatbotForecast.ask_graph:
+    extra observability without changing this function's existing
+    (answer, action, room) return shape that callers and tests rely on.
     """
+    cb = UsageMetadataCallbackHandler()
+
     try:
-        parsed = parser.parse(classification_chain.run(question=query))
+        parsed = parser.parse(classification_chain.run(question=query, callbacks=[cb]))
     except Exception as e:
+        if usage_callback:
+            usage_callback(cb.usage_metadata)
         return f"❌ Failed to classify query: {e}", None, None
 
     action = parsed.get("action")
@@ -387,11 +399,15 @@ def ask(query, classification_chain, fallback_chain, parser, graph_helper, senso
                 )
 
         else:
-            answer = fallback_chain.run(question=query)
+            answer = fallback_chain.run(question=query, callbacks=[cb])
 
     except Exception as e:
+        if usage_callback:
+            usage_callback(cb.usage_metadata)
         return f"❌ Failed to answer query: {e}", action, room
 
+    if usage_callback:
+        usage_callback(cb.usage_metadata)
     return answer, action, room
 
 
@@ -426,10 +442,12 @@ def main():
 
     if st.button("Ask"):
         if query:
+            usage = {}
             with st.spinner("Thinking..."):
                 start_time = time.time()
                 answer, action, room = ask(
-                    query, classification_chain, fallback_chain, parser, graph_helper, sensor_helper
+                    query, classification_chain, fallback_chain, parser, graph_helper, sensor_helper,
+                    usage_callback=usage.update,
                 )
                 latency_ms = round((time.time() - start_time) * 1000)
 
@@ -441,6 +459,7 @@ def main():
                 "outcome": "failed" if _is_error(answer) else "success",
                 "answer": answer,
                 "latency_ms": latency_ms,
+                "usage": usage,
             })
 
             if _is_error(answer):
