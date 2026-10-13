@@ -61,6 +61,8 @@
   .eyebrow{ font-family:var(--font-mono); font-size:12px; letter-spacing:.09em; text-transform:uppercase;
             color:var(--accent); margin-bottom:14px; }
   h1.title{ font-size:clamp(32px,6vw,52px); line-height:1.05; margin-bottom:16px; }
+  .byline{ font-family:var(--font-mono); font-size:13px; color:var(--fg-muted); margin-bottom:18px; }
+  .byline b{ color:var(--fg); font-weight:600; }
   .dek{ font-size:17px; color:var(--fg-muted); max-width:62ch; margin-bottom:28px; }
   .stat-strip{ display:flex; flex-wrap:wrap; gap:10px; }
   .source-link{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:13px;
@@ -80,6 +82,11 @@
   h2.section-title{ font-size:26px; }
 
   /* ---------- three-architecture cards ---------- */
+  .diagram-figure{ margin:22px 0; border:1px solid var(--border); border-radius:12px; padding:18px 20px;
+                    background:var(--panel); min-width:0; }
+  .diagram-figure svg{ display:block; width:100%; height:auto; color:var(--fg); }
+  .diagram-figure text{ font-family:var(--font-mono); }
+  .diagram-figure figcaption{ font-size:13px; color:var(--fg-muted); margin-top:12px; text-align:center; }
   .arch-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-block:24px; min-width:0; }
   @media (max-width:700px){ .arch-row{ grid-template-columns:1fr; } }
   .arch-card{ background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:18px;
@@ -153,6 +160,7 @@
   <div class="hero">
     <div class="eyebrow">Building systems &middot; agentic architecture benchmark</div>
     <h1 class="title">Three architectures, one dorm</h1>
+    <p class="byline">By <b>icy-mint</b> &middot; benchmark run October 12, 2026</p>
     <p class="dek">A small, controlled stand-in for a real facilities problem: a building graph plus
       sensor time-series, three different ways to let an LLM answer questions over it &mdash; a fixed
       intent classifier, a text-to-Cypher chain, and a typed tool-calling agent &mdash; graded against
@@ -211,6 +219,165 @@
           never writes a query itself &mdash; only picks tools and arguments.</div>
       </div>
     </div>
+
+    <h3 style="font-size:19px;margin-block:30px 6px">How each one actually works</h3>
+
+    <figure class="diagram-figure" style="--c:var(--sys-cb)">
+      <svg viewBox="0 0 720 220" role="img" aria-label="chatbot_classifier.py: a question goes through one classifier LLM call, which routes it to a hardcoded Cypher query, a pandas lookup, or a fallback LLM call -- nothing is generated at query time.">
+        <defs>
+          <marker id="arrow1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <rect x="10" y="88" width="110" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="65" y="106" text-anchor="middle" font-size="12">User</text>
+        <text x="65" y="120" text-anchor="middle" font-size="12">question</text>
+
+        <rect x="170" y="88" width="140" height="44" rx="7" fill="none" stroke="currentColor" style="color:var(--c)"/>
+        <text x="240" y="106" text-anchor="middle" font-size="12">Classifier LLM</text>
+        <text x="240" y="120" text-anchor="middle" font-size="12">intent + rooms</text>
+
+        <rect x="420" y="10" width="180" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="510" y="28" text-anchor="middle" font-size="12">Hardcoded Cypher</text>
+        <text x="510" y="42" text-anchor="middle" font-size="12">&#8594; Neo4j</text>
+
+        <rect x="420" y="88" width="180" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="510" y="106" text-anchor="middle" font-size="12">Pandas lookup</text>
+        <text x="510" y="120" text-anchor="middle" font-size="12">&#8594; CSV / TimescaleDB</text>
+
+        <rect x="420" y="166" width="180" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="510" y="184" text-anchor="middle" font-size="12">Fallback LLM</text>
+        <text x="510" y="198" text-anchor="middle" font-size="12">free text</text>
+
+        <rect x="650" y="88" width="60" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="680" y="114" text-anchor="middle" font-size="12">Answer</text>
+
+        <line x1="120" y1="110" x2="170" y2="110" stroke="currentColor" marker-end="url(#arrow1)"/>
+        <text x="145" y="100" text-anchor="middle" font-size="11">asks</text>
+
+        <line x1="310" y1="105" x2="420" y2="40" stroke="currentColor" marker-end="url(#arrow1)"/>
+        <text x="330" y="65" font-size="11">current_*, ac_mapping</text>
+
+        <line x1="310" y1="110" x2="420" y2="110" stroke="currentColor" marker-end="url(#arrow1)"/>
+        <text x="330" y="100" font-size="11">temp/occupancy, named rooms</text>
+
+        <line x1="310" y1="115" x2="420" y2="178" stroke="currentColor" marker-end="url(#arrow1)"/>
+        <text x="330" y="150" font-size="11">unclassified</text>
+
+        <line x1="600" y1="40" x2="650" y2="105" stroke="currentColor" marker-end="url(#arrow1)"/>
+        <line x1="600" y1="110" x2="650" y2="110" stroke="currentColor" marker-end="url(#arrow1)"/>
+        <line x1="600" y1="178" x2="650" y2="115" stroke="currentColor" marker-end="url(#arrow1)"/>
+      </svg>
+      <figcaption>One classifier call picks ONE of three fixed paths. No query is ever generated at
+        request time &mdash; the Cypher for each intent was written in advance.</figcaption>
+    </figure>
+
+    <figure class="diagram-figure" style="--c:var(--sys-cf)">
+      <svg viewBox="0 0 700 270" role="img" aria-label="chatbot_nl2cypher.py: a forecast keyword check either bypasses the LLM entirely with a pandas shortcut, or sends the question to an LLM that writes Cypher, which Neo4j executes and a second LLM call paraphrases -- with one retry if the query fails.">
+        <defs>
+          <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <rect x="10" y="88" width="100" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="60" y="114" text-anchor="middle" font-size="12">Question</text>
+
+        <polygon points="230,75 285,110 230,145 175,110" fill="none" stroke="currentColor" style="color:var(--c)"/>
+        <text x="230" y="106" text-anchor="middle" font-size="11">forecast</text>
+        <text x="230" y="119" text-anchor="middle" font-size="11">keyword?</text>
+
+        <rect x="340" y="88" width="130" height="44" rx="7" fill="none" stroke="currentColor" style="color:var(--c)"/>
+        <text x="405" y="106" text-anchor="middle" font-size="12">LLM writes</text>
+        <text x="405" y="120" text-anchor="middle" font-size="12">Cypher</text>
+
+        <rect x="540" y="88" width="130" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="605" y="106" text-anchor="middle" font-size="12">Neo4j</text>
+        <text x="605" y="120" text-anchor="middle" font-size="12">executes</text>
+
+        <rect x="165" y="198" width="130" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="230" y="216" text-anchor="middle" font-size="12">Pandas</text>
+        <text x="230" y="230" text-anchor="middle" font-size="12">shortcut</text>
+
+        <rect x="365" y="198" width="110" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="420" y="224" text-anchor="middle" font-size="12">Answer</text>
+
+        <rect x="540" y="198" width="130" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="605" y="216" text-anchor="middle" font-size="12">LLM</text>
+        <text x="605" y="230" text-anchor="middle" font-size="12">paraphrases</text>
+
+        <line x1="110" y1="110" x2="175" y2="110" stroke="currentColor" marker-end="url(#arrow2)"/>
+        <line x1="285" y1="110" x2="340" y2="110" stroke="currentColor" marker-end="url(#arrow2)"/>
+        <text x="312" y="100" text-anchor="middle" font-size="11">no</text>
+        <line x1="230" y1="145" x2="230" y2="198" stroke="currentColor" marker-end="url(#arrow2)"/>
+        <text x="245" y="172" font-size="11">yes</text>
+        <line x1="470" y1="110" x2="540" y2="110" stroke="currentColor" marker-end="url(#arrow2)"/>
+        <text x="505" y="100" text-anchor="middle" font-size="10">query</text>
+        <line x1="605" y1="132" x2="605" y2="198" stroke="currentColor" marker-end="url(#arrow2)"/>
+        <text x="618" y="168" font-size="11">rows</text>
+        <line x1="295" y1="220" x2="365" y2="220" stroke="currentColor" marker-end="url(#arrow2)"/>
+        <line x1="540" y1="220" x2="475" y2="220" stroke="currentColor" marker-end="url(#arrow2)"/>
+
+        <path d="M605,88 C605,35 405,35 405,88" fill="none" stroke="currentColor" marker-end="url(#arrow2)"/>
+        <text x="505" y="40" text-anchor="middle" font-size="11">error &#8594; retry once</text>
+      </svg>
+      <figcaption>Every question becomes a database call unless it happens to contain a forecast
+        keyword. A failed or empty query gets ONE retry with the error fed back; there is no
+        third path that just declines.</figcaption>
+    </figure>
+
+    <figure class="diagram-figure" style="--c:var(--sys-da)">
+      <svg viewBox="0 0 760 320" role="img" aria-label="tool-calling-agent: Claude and a typed tool function exchange tool-use and tool-result messages in a loop, up to five times, before Claude either produces a final answer or an MCP client reaches the same tool function through a separate door.">
+        <defs>
+          <marker id="arrow3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <rect x="10" y="148" width="110" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="65" y="166" text-anchor="middle" font-size="12">User</text>
+        <text x="65" y="180" text-anchor="middle" font-size="12">question</text>
+
+        <rect x="200" y="148" width="160" height="44" rx="7" fill="none" stroke="currentColor" style="color:var(--c)"/>
+        <text x="280" y="166" text-anchor="middle" font-size="12">Claude</text>
+        <text x="280" y="180" text-anchor="middle" font-size="12">claude-sonnet-5</text>
+
+        <rect x="460" y="148" width="180" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="550" y="166" text-anchor="middle" font-size="12">Typed tool fn</text>
+        <text x="550" y="180" text-anchor="middle" font-size="12">validates args</text>
+
+        <rect x="460" y="236" width="80" height="36" rx="6" fill="none" stroke="currentColor"/>
+        <text x="500" y="259" text-anchor="middle" font-size="11">Neo4j</text>
+        <rect x="560" y="236" width="80" height="36" rx="6" fill="none" stroke="currentColor"/>
+        <text x="600" y="253" text-anchor="middle" font-size="11">Timescale</text>
+        <text x="600" y="265" text-anchor="middle" font-size="11">DB</text>
+
+        <rect x="225" y="250" width="110" height="44" rx="7" fill="none" stroke="currentColor"/>
+        <text x="280" y="276" text-anchor="middle" font-size="12">Answer</text>
+
+        <rect x="460" y="36" width="180" height="44" rx="7" fill="none" stroke="var(--sys-da)"/>
+        <text x="550" y="54" text-anchor="middle" font-size="12" fill="var(--sys-da)">MCP client</text>
+        <text x="550" y="68" text-anchor="middle" font-size="12" fill="var(--sys-da)">Claude Desktop, etc.</text>
+
+        <line x1="120" y1="170" x2="200" y2="170" stroke="currentColor" marker-end="url(#arrow3)"/>
+        <line x1="360" y1="162" x2="460" y2="162" stroke="currentColor" marker-end="url(#arrow3)"/>
+        <text x="410" y="152" text-anchor="middle" font-size="11">tool_use</text>
+        <line x1="460" y1="182" x2="360" y2="182" stroke="currentColor" marker-end="url(#arrow3)"/>
+        <text x="410" y="200" text-anchor="middle" font-size="11">tool_result</text>
+        <text x="410" y="213" text-anchor="middle" font-size="10" fill="var(--fg-muted)">up to 5&#215;</text>
+
+        <line x1="520" y1="192" x2="505" y2="236" stroke="currentColor" marker-end="url(#arrow3)"/>
+        <line x1="580" y1="192" x2="595" y2="236" stroke="currentColor" marker-end="url(#arrow3)"/>
+
+        <line x1="280" y1="192" x2="280" y2="250" stroke="currentColor" marker-end="url(#arrow3)"/>
+        <text x="296" y="222" font-size="11">final text</text>
+
+        <line x1="550" y1="80" x2="550" y2="148" stroke="var(--sys-da)" stroke-dasharray="5,4" marker-end="url(#arrow3)" style="color:var(--sys-da)"/>
+        <text x="650" y="110" text-anchor="middle" font-size="11" fill="var(--sys-da)">same tool,</text>
+        <text x="650" y="123" text-anchor="middle" font-size="11" fill="var(--sys-da)">different door</text>
+      </svg>
+      <figcaption>Claude and the tool layer trade messages in a loop (capped at 5 round trips) before
+        producing a final answer. The MCP server added later (highlighted) reaches the exact same
+        tool functions through a second, independent entry point.</figcaption>
+    </figure>
 
     <p>Each one is a real, reasonable choice, and each is usually defended with the same anecdotes: fixed
       taxonomies are "fast and cheap but brittle," text-to-query is "flexible but unsafe," agents are
